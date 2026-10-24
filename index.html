@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Toy Drive Scanner</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+<style>
+  :root { --bg:#f6f7f4; --card:#fff; --fg:#1d2420; --muted:#5f6b64; --red:#b3261e; --green:#1f6b45; --line:#d9ded8; --warn:#8a5a00; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--fg); -webkit-tap-highlight-color: transparent; }
+  header { background:var(--green); color:#fff; padding:14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left)); padding-top: max(14px, env(safe-area-inset-top)); display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  header h1 { font-size:18px; margin:0; }
+  .hright { text-align:right; line-height:1.25; font-size:13px; }
+  #ver { font-size:12px; opacity:.8; }
+  main { padding:16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); display:flex; flex-direction:column; gap:14px; max-width:520px; margin:0 auto; }
+  .mode { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .mode button { border:0; padding:12px; font-size:15px; background:var(--card); color:var(--fg); }
+  .mode button.on { background:var(--fg); color:#fff; }
+  #reader { width:100%; border-radius:10px; overflow:hidden; background:#000; }
+  #reader video { border-radius:10px; }
+  .btn { display:block; width:100%; padding:14px; font-size:16px; border-radius:10px; border:0; background:var(--red); color:#fff; font-weight:600; text-align:center; cursor:pointer; }
+  .btn.alt { background:var(--card); color:var(--fg); border:1px solid var(--line); font-weight:500; }
+  .btn:disabled { opacity:.6; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  label, .lbl { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  input { width:100%; padding:10px; font-size:16px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
+  .choices { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .choices button { padding:12px 4px; font-size:15px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
+  .choices button.on { background:var(--green); color:#fff; border-color:var(--green); }
+  .row { display:flex; gap:8px; }
+  .row input { flex:1; min-width:0; }
+  .row .btn { width:auto; padding:10px 16px; }
+  #status { font-size:14px; color:var(--muted); min-height:20px; }
+  #status.err { color:var(--red); }
+  a.amz { font-size:14px; color:var(--green); }
+  #recent { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+  #recent li { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:14px; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-variant-numeric: tabular-nums; }
+  #recent .st { font-size:12px; color:var(--muted); }
+  #recent .st.ok { color:var(--green); }
+  #recent .st.bad { color:var(--red); }
+  #recent button { font-size:13px; padding:4px 10px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--fg); }
+  .flash { animation: flash .5s; }
+  @keyframes flash { from { box-shadow: 0 0 0 4px var(--green); } to { box-shadow: 0 0 0 0 transparent; } }
+  .link { background:none; border:0; color:var(--muted); font-size:13px; text-decoration:underline; padding:0; align-self:center; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Toy Drive Scanner</h1>
+  <div class="hright"><div id="ver"></div><div id="count"></div></div>
+</header>
+
+<main>
+  <!-- One-time setup on each phone -->
+  <div class="card" id="setup" hidden>
+    <div class="lbl">Set up this phone</div>
+    <div><label for="setName">Your name</label><input id="setName" autocomplete="name" placeholder="e.g. Maria"></div>
+    <div><label for="setPass">Passcode</label><input id="setPass" autocomplete="off" placeholder="Ask the toy drive leader"></div>
+    <button class="btn" id="setSave">Continue</button>
+    <div id="setMsg" class="st"></div>
+  </div>
+
+  <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
+    <div class="mode">
+      <button id="mQuick" class="on">Quick add</button>
+      <button id="mBatch">Batch scan</button>
+    </div>
+
+    <div id="reader"></div>
+    <button class="btn" id="startBtn">Start scanning</button>
+    <button class="btn alt" id="stopBtn" hidden>Stop camera</button>
+    <div id="status">Tap Start scanning and point the camera at a barcode.</div>
+
+    <div class="card" id="form" hidden>
+      <div><div class="lbl">Barcode</div><div id="fCode" style="font-size:18px;font-variant-numeric:tabular-nums"></div></div>
+      <div><label for="fName">Item name</label><input id="fName" placeholder="Optional"></div>
+      <a class="amz" id="fAmz" target="_blank" rel="noopener">Check price on Amazon ↗</a>
+      <div><div class="lbl">For</div>
+        <div class="choices" data-field="forWho"><button>Boy</button><button>Girl</button><button>Either</button></div></div>
+      <div><div class="lbl">Gift size</div>
+        <div class="choices" data-field="size"><button>Small</button><button>Medium</button><button>Large</button></div></div>
+      <button class="btn" id="saveBtn">Save toy</button>
+      <button class="btn alt" id="skipBtn">Cancel</button>
+    </div>
+
+    <ul id="recent"></ul>
+
+    <div class="row">
+      <input id="manual" inputmode="numeric" placeholder="Type a barcode">
+      <button class="btn alt" id="manualBtn">Add</button>
+    </div>
+    <label class="btn alt" for="photo" style="text-transform:none;letter-spacing:0;font-size:16px;color:var(--fg)">📷 Use a photo instead</label>
+    <input type="file" id="photo" accept="image/*" capture="environment" hidden>
+    <img id="preview" hidden alt="Photo the reader saw" style="width:100%;border-radius:10px;border:1px solid var(--line)">
+
+    <button class="link" id="changeSetup">Change name or passcode</button>
+  </div>
+</main>
+
+<script>
+  /* ====== SETUP: paste your Apps Script web app URL here ====== */
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyRL1KZmp1m3G1k4KW46NkgeCnMRR6iosK-SmNu0Dv3GWi-fAs9FcpOUVwpZcxV0uAH/exec';
+  /* ============================================================ */
+
+  const APP_VERSION = 'live v1';
+  const $ = id => document.getElementById(id);
+  const status = (t, err) => { $('status').textContent = t; $('status').classList.toggle('err', !!err); };
+  $('ver').textContent = APP_VERSION;
+
+  const store = {
+    get(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  let settings = { name: store.get('tds_name'), pass: store.get('tds_pass') };
+
+  async function api(body) {
+    const res = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight Apps Script can't answer
+      body: JSON.stringify(Object.assign({ passcode: settings.pass }, body))
+    });
+    return res.json();
+  }
+
+  /* ---------- One-time setup ---------- */
+  function showSetup() {
+    $('setName').value = settings.name;
+    $('setPass').value = settings.pass;
+    $('setup').hidden = false;
+    $('app').hidden = true;
+  }
+  function showApp() { $('setup').hidden = true; $('app').hidden = false; }
+
+  $('setSave').onclick = async () => {
+    const name = $('setName').value.trim(), pass = $('setPass').value.trim();
+    if (!name || !pass) { $('setMsg').textContent = 'Enter your name and the passcode.'; return; }
+    if (SCRIPT_URL.indexOf('https://') !== 0) { $('setMsg').textContent = 'This page isn\'t connected to the Sheet yet. The web app URL needs to be added to the page.'; return; }
+    $('setSave').disabled = true;
+    $('setMsg').textContent = 'Checking…';
+    settings = { name, pass };
+    try {
+      const r = await api({ action: 'check' });
+      if (r.ok) {
+        store.set('tds_name', name); store.set('tds_pass', pass);
+        showCount(r.total); showApp();
+      } else {
+        $('setMsg').textContent = r.error === 'wrong_passcode' ? 'That passcode isn\'t right. Check with the toy drive leader.' : 'The Sheet answered with an error: ' + r.error;
+      }
+    } catch (e) {
+      $('setMsg').textContent = 'Couldn\'t reach the Sheet. Check your internet connection and try again.';
+    }
+    $('setSave').disabled = false;
+  };
+  $('changeSetup').onclick = () => { stopCamera(); showSetup(); };
+
+  /* ---------- Modes ---------- */
+  let mode = 'quick', current = null, formOpen = false;
+  $('mQuick').onclick = () => setMode('quick');
+  $('mBatch').onclick = () => setMode('batch');
+  function setMode(m) {
+    mode = m;
+    $('mQuick').classList.toggle('on', m === 'quick');
+    $('mBatch').classList.toggle('on', m === 'batch');
+    if (formOpen) closeForm();
+    status(m === 'batch' ? 'Batch scan: each barcode saves with a beep. Finish details on the PC later.' : 'Quick add: scan a toy, then answer two questions.');
+  }
+
+  document.querySelectorAll('.choices').forEach(group => {
+    group.querySelectorAll('button').forEach(b => b.onclick = () => {
+      group.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      if (current) current[group.dataset.field] = b.textContent;
+    });
+  });
+
+  /* ---------- Beep (needs a tap first on iPhone) ---------- */
+  let audio = null;
+  function beep(ok) {
+    if (navigator.vibrate) navigator.vibrate(ok ? 60 : [60, 60, 60]);
+    if (!audio) return;
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = ok ? 1100 : 300;
+    g.gain.setValueAtTime(0.15, audio.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.15);
+    o.connect(g); g.connect(audio.destination);
+    o.start(); o.stop(audio.currentTime + 0.16);
+  }
+
+  /* ---------- Live camera ---------- */
+  let scanner = null, lastCode = '', lastAt = 0;
+  $('startBtn').onclick = async () => {
+    try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch (e) {}
+    try {
+      scanner = scanner || new Html5Qrcode('reader', {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_128
+        ],
+        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+        verbose: false
+      });
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 12, qrbox: (w, h) => ({ width: Math.floor(Math.min(w * 0.9, 380)), height: Math.floor(Math.min(h * 0.45, 170)) }) },
+        code => onScan(code)
+      );
+      $('startBtn').hidden = true; $('stopBtn').hidden = false;
+      status(mode === 'batch' ? 'Scanning. Hold each barcode in the box until it beeps.' : 'Scanning. Hold a barcode in the box.');
+    } catch (e) {
+      status('The camera didn\'t start. Allow camera access when asked, or use a photo instead. (' + (e && e.message ? e.message : e) + ')', true);
+    }
+  };
+  $('stopBtn').onclick = () => stopCamera();
+  function stopCamera() {
+    if (scanner && scanner.isScanning) scanner.stop().catch(() => {});
+    $('startBtn').hidden = false; $('stopBtn').hidden = true;
+  }
+
+  /* ---------- Handle a scanned code ---------- */
+  function onScan(code) {
+    code = String(code).trim();
+    if (!code || formOpen) return;
+    const now = Date.now();
+    if (code === lastCode && now - lastAt < 3000) return; // same toy still in view
+    lastCode = code; lastAt = now;
+    beep(true);
+    if (mode === 'batch') { saveBatch(code); return; }
+    openForm(code);
+  }
+
+  function saveBatch(code) {
+    const li = addRecent(code, 'Saving…');
+    send({ barcode: code }, li);
+    status('Got ' + code + '. Scan the next one.');
+  }
+
+  async function send(item, li) {
+    setRecent(li, 'Saving…', '');
+    try {
+      const r = await api({ action: 'save', item, scannedBy: settings.name });
+      if (r.ok) { setRecent(li, 'Saved', 'ok'); showCount(r.total); return true; }
+      if (r.error === 'wrong_passcode') { setRecent(li, 'Wrong passcode', 'bad', item); status('The passcode was changed. Tap "Change name or passcode".', true); return false; }
+      setRecent(li, 'Not saved', 'bad', item);
+    } catch (e) {
+      setRecent(li, 'No connection', 'bad', item);
+    }
+    beep(false);
+    return false;
+  }
+
+  /* ---------- Recent scans list (last 8) ---------- */
+  function addRecent(code, text) {
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="code"></span><span class="right"><span class="st"></span></span>';
+    li.querySelector('.code').textContent = code;
+    $('recent').prepend(li);
+    while ($('recent').children.length > 8) $('recent').lastChild.remove();
+    li.classList.add('flash');
+    return li;
+  }
+  function setRecent(li, text, cls, retryItem) {
+    const right = li.querySelector('.right');
+    right.innerHTML = '<span class="st"></span>';
+    const st = right.querySelector('.st');
+    st.textContent = text; if (cls) st.classList.add(cls);
+    if (retryItem) {
+      const b = document.createElement('button');
+      b.textContent = 'Retry';
+      b.onclick = () => send(retryItem, li);
+      right.append(' ', b);
+    }
+  }
+
+  /* ---------- Quick add form ---------- */
+  function openForm(code) {
+    formOpen = true;
+    if (scanner && scanner.isScanning) { try { scanner.pause(true); } catch (e) {} }
+    current = { barcode: code };
+    $('fCode').textContent = code;
+    $('fName').value = '';
+    $('fAmz').href = 'https://www.amazon.com/s?k=' + encodeURIComponent(code);
+    document.querySelectorAll('.choices button').forEach(x => x.classList.remove('on'));
+    $('form').hidden = false;
+    $('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    status('Looking up ' + code + '…');
+    api({ action: 'lookup', barcode: code }).then(r => {
+      if (!current || current.barcode !== code) return;
+      if (r.found) { if (!$('fName').value) $('fName').value = r.name; current.brand = r.brand; status('Found it. Pick who it\'s for and the size.'); }
+      else status('No name found. Type one if you like, then pick who it\'s for and the size.');
+    }).catch(() => status('Pick who it\'s for and the size.'));
+  }
+  function closeForm() {
+    formOpen = false; current = null;
+    $('form').hidden = true; $('saveBtn').disabled = false;
+    if (scanner) { try { scanner.resume(); } catch (e) {} }
+  }
+  $('saveBtn').onclick = async () => {
+    if (!current) return;
+    current.name = $('fName').value.trim();
+    const item = current;
+    $('saveBtn').disabled = true;
+    const li = addRecent(item.barcode + (item.name ? ' · ' + item.name : ''), 'Saving…');
+    closeForm();
+    lastCode = item.barcode; lastAt = Date.now(); // don't re-read the same toy right away
+    const ok = await send(item, li);
+    status(ok ? 'Saved. Scan the next toy.' : 'That one didn\'t save. Tap Retry next to it.', !ok);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  $('skipBtn').onclick = () => { closeForm(); status('Cancelled. Scan the next toy.'); };
+
+  $('manualBtn').onclick = () => { const v = $('manual').value.trim(); if (v) { $('manual').value = ''; lastCode = ''; onScan(v); } };
+
+  /* ---------- Photo fallback (same reader as the in-Sheet page) ---------- */
+  const zxReader = new ZXing.MultiFormatReader();
+  (function () {
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E, ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.CODE_128
+    ]);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    zxReader.setHints(hints);
+  })();
+  const workCanvas = document.createElement('canvas');
+
+  $('photo').onchange = async e => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    $('preview').hidden = true;
+    let img;
+    try { img = await loadImage(file); } catch (err) { status('Couldn\'t open that photo. Try again.', true); return; }
+    const attempts = [[1600, 0, 1], [1600, 0, 0.5], [2400, 0, 1], [1000, 0, 1], [1600, 90, 1], [1600, 90, 0.5]];
+    for (let i = 0; i < attempts.length; i++) {
+      status('Reading barcode… (try ' + (i + 1) + ' of ' + attempts.length + ')');
+      await new Promise(r => setTimeout(r, 30));
+      try {
+        drawToCanvas(img, attempts[i][0], attempts[i][1], attempts[i][2]);
+        const bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(workCanvas)));
+        const code = zxReader.decode(bmp).getText();
+        URL.revokeObjectURL(img.src);
+        lastCode = '';
+        onScan(code);
+        return;
+      } catch (err) { /* next try */ }
+    }
+    drawToCanvas(img, 600, 0, 1);
+    $('preview').src = workCanvas.toDataURL('image/jpeg', 0.7);
+    $('preview').hidden = false;
+    URL.revokeObjectURL(img.src);
+    status('Couldn\'t find a barcode in that photo. Here\'s what the reader saw:', true);
+  };
+  function loadImage(file) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('load'));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  function drawToCanvas(img, maxSide, rotate, crop) {
+    const sw = img.width * crop, sh = img.height * crop;
+    const sx = (img.width - sw) / 2, sy = (img.height - sh) / 2;
+    const scale = Math.min(1, maxSide / Math.max(sw, sh));
+    const w = Math.round(sw * scale), h = Math.round(sh * scale);
+    const c = workCanvas;
+    if (rotate === 90) { c.width = h; c.height = w; } else { c.width = w; c.height = h; }
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (rotate === 90) { ctx.translate(h, 0); ctx.rotate(Math.PI / 2); }
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+  }
+
+  function showCount(n) { if (typeof n === 'number') $('count').textContent = n + ' toys'; }
+
+  /* ---------- Start ---------- */
+  if (settings.name && settings.pass) showApp(); else showSetup();
+</script>
+</body>
+</html>
