@@ -28,6 +28,8 @@
   input { width:100%; padding:10px; font-size:16px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
   .choices { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
   .choices button { padding:12px 4px; font-size:15px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
+  .choices.five { grid-template-columns:repeat(5,1fr); gap:6px; }
+  .choices.five button { padding:12px 2px; font-size:14px; }
   .choices button.on { background:var(--green); color:#fff; border-color:var(--green); }
   .row { display:flex; gap:8px; }
   .row input { flex:1; min-width:0; }
@@ -80,6 +82,8 @@
       <a class="amz" id="fAmz" target="_blank" rel="noopener">Check price on Amazon ↗</a>
       <div><div class="lbl">For</div>
         <div class="choices" data-field="forWho"><button>Boy</button><button>Girl</button><button>Either</button></div></div>
+      <div><div class="lbl">Age</div>
+        <div class="choices five" data-field="age"><button>0-2</button><button>3-5</button><button>6-8</button><button>9-12</button><button>Teen</button></div></div>
       <div><div class="lbl">Gift size</div>
         <div class="choices" data-field="size"><button>Small</button><button>Medium</button><button>Large</button></div></div>
       <button class="btn" id="saveBtn">Save toy</button>
@@ -105,7 +109,7 @@
   const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyRL1KZmp1m3G1k4KW46NkgeCnMRR6iosK-SmNu0Dv3GWi-fAs9FcpOUVwpZcxV0uAH/exec';
   /* ============================================================ */
 
-  const APP_VERSION = 'live v1';
+  const APP_VERSION = 'live v2';
   const $ = id => document.getElementById(id);
   const status = (t, err) => { $('status').textContent = t; $('status').classList.toggle('err', !!err); };
   $('ver').textContent = APP_VERSION;
@@ -165,7 +169,7 @@
     $('mQuick').classList.toggle('on', m === 'quick');
     $('mBatch').classList.toggle('on', m === 'batch');
     if (formOpen) closeForm();
-    status(m === 'batch' ? 'Batch scan: each barcode saves with a beep. Finish details on the PC later.' : 'Quick add: scan a toy, then answer two questions.');
+    status(m === 'batch' ? 'Batch scan: each barcode saves with a beep. Finish details on the PC later.' : 'Quick add: scan a toy, then pick who it\'s for, the age and the size.');
   }
 
   document.querySelectorAll('.choices').forEach(group => {
@@ -242,7 +246,7 @@
     setRecent(li, 'Saving…', '');
     try {
       const r = await api({ action: 'save', item, scannedBy: settings.name });
-      if (r.ok) { setRecent(li, 'Saved', 'ok'); showCount(r.total); return true; }
+      if (r.ok) { setRecent(li, r.merged ? 'Added · now ' + r.qty : 'Saved', 'ok'); showCount(r.total); return true; }
       if (r.error === 'wrong_passcode') { setRecent(li, 'Wrong passcode', 'bad', item); status('The passcode was changed. Tap "Change name or passcode".', true); return false; }
       setRecent(li, 'Not saved', 'bad', item);
     } catch (e) {
@@ -289,9 +293,9 @@
     status('Looking up ' + code + '…');
     api({ action: 'lookup', barcode: code }).then(r => {
       if (!current || current.barcode !== code) return;
-      if (r.found) { if (!$('fName').value) $('fName').value = r.name; current.brand = r.brand; status('Found it. Pick who it\'s for and the size.'); }
-      else status('No name found. Type one if you like, then pick who it\'s for and the size.');
-    }).catch(() => status('Pick who it\'s for and the size.'));
+      if (r.found) { if (!$('fName').value) $('fName').value = r.name; current.brand = r.brand; status('Found it. Pick who it\'s for, the age and the size.'); }
+      else status('No name found. Type one if you like, then pick who it\'s for, the age and the size.');
+    }).catch(() => status('Pick who it\'s for, the age and the size.'));
   }
   function closeForm() {
     formOpen = false; current = null;
