@@ -109,7 +109,7 @@
   const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyRL1KZmp1m3G1k4KW46NkgeCnMRR6iosK-SmNu0Dv3GWi-fAs9FcpOUVwpZcxV0uAH/exec';
   /* ============================================================ */
 
-  const APP_VERSION = 'live v3';
+  const APP_VERSION = 'live v4';
   const $ = id => document.getElementById(id);
   const status = (t, err) => { $('status').textContent = t; $('status').classList.toggle('err', !!err); };
   $('ver').textContent = APP_VERSION;
@@ -127,22 +127,6 @@
       body: JSON.stringify(Object.assign({ passcode: settings.pass }, body))
     });
     return res.json();
-  }
-
-  /* ---------- Name lookup: phone first (its own daily quota), then the Sheet ---------- */
-  async function lookupName(code) {
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 6000);
-      const res = await fetch('https://api.upcitemdb.com/prod/trial/lookup?upc=' + encodeURIComponent(code), { signal: ctrl.signal });
-      clearTimeout(timer);
-      if (res.ok) {
-        const data = await res.json();
-        const item = data.items && data.items[0];
-        return item ? { found: true, name: item.title || '', brand: item.brand || '' } : { found: false };
-      }
-    } catch (e) { /* blocked, timed out or offline: fall back to the Sheet */ }
-    return api({ action: 'lookup', barcode: code });
   }
 
   /* ---------- One-time setup ---------- */
@@ -307,7 +291,7 @@
     $('form').hidden = false;
     $('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
     status('Looking up ' + code + '…');
-    lookupName(code).then(r => {
+    api({ action: 'lookup', barcode: code }).then(r => {
       if (!current || current.barcode !== code) return;
       if (r.found) { if (!$('fName').value) $('fName').value = r.name; current.brand = r.brand; status('Found it. Pick who it\'s for, the age and the size.'); }
       else status('No name found. Type one if you like, then pick who it\'s for, the age and the size.');
