@@ -6,7 +6,7 @@
 <title>Sign-up QR Codes</title>
 <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
 <style>
-  :root { --fg:#1d2420; --muted:#5f6b64; --green:#1f6b45; --line:#d9ded8; }
+  :root { --fg:#1d2420; --muted:#5f6b64; --green:#1f6b45; --line:#d9ded8; --girls:#c2185b; --boys:#1565c0; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:#fff; color:var(--fg); }
   .bar { max-width:8in; margin:0 auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
@@ -18,12 +18,19 @@
   .code svg { width:100%; max-width:2in; height:auto; display:block; margin:0 auto; }
   .code .name { font-size:22px; font-weight:700; margin-top:4px; }
   .code .hint { font-size:11px; color:var(--muted); }
+  /* Deep pink and blue: dark enough for any phone to scan, easy to tell apart at the table. */
+  .code.girls { border-top:6px solid var(--girls); }
+  .code.boys { border-top:6px solid var(--boys); }
+  .code.girls svg path { fill:var(--girls); }
+  .code.boys svg path { fill:var(--boys); }
+  .code.girls .name { color:var(--girls); }
+  .code.boys .name { color:var(--boys); }
   @media (max-width:480px) { .sheet { grid-template-columns:repeat(2, 1fr); } }
   @page { size: letter; margin: 0.4in; }
   @media print {
     .bar { display:none; }
     .sheet { max-width:none; padding:0; grid-template-columns:repeat(3, 1fr); }
-    .code { height:2.55in; padding:6px; }
+    .code { height:2.55in; padding:6px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     .code svg { max-width:1.85in; }
   }
 </style>
@@ -48,7 +55,7 @@
     qr.addData('SIGNUP:' + cat);
     qr.make();
     const div = document.createElement('div');
-    div.className = 'code';
+    div.className = 'code ' + (cat.indexOf('Girls') === 0 ? 'girls' : 'boys');
     div.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true }) +
       '<div class="name"></div><div class="hint">Toy drive sign-up</div>';
     div.querySelector('.name').textContent = cat;

@@ -6,7 +6,7 @@
 <title>Toy Drive Sign-ups</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
-  :root { --bg:#f6f7f4; --card:#fff; --fg:#1d2420; --muted:#5f6b64; --red:#b3261e; --green:#1f6b45; --line:#d9ded8; }
+  :root { --bg:#f6f7f4; --card:#fff; --fg:#1d2420; --muted:#5f6b64; --red:#b3261e; --green:#1f6b45; --line:#d9ded8; --girls:#c2185b; --boys:#1565c0; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--fg); -webkit-tap-highlight-color: transparent; }
   header { background:var(--green); color:#fff; padding:14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left)); padding-top: max(14px, env(safe-area-inset-top)); display:flex; justify-content:space-between; align-items:center; gap:12px; }
@@ -33,6 +33,10 @@
   .grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; }
   .grid div, .grid button { display:flex; justify-content:space-between; padding:8px 10px; font-size:15px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); font-variant-numeric: tabular-nums; }
   .grid b { font-weight:700; }
+  .grid .girls { border-left:5px solid var(--girls); }
+  .grid .boys { border-left:5px solid var(--boys); }
+  details .grid .girls { color:var(--girls); }
+  details .grid .boys { color:var(--boys); }
   details summary { cursor:pointer; font-size:14px; color:var(--muted); padding:4px 0; }
   details .grid { margin-top:8px; }
   details .grid button { justify-content:center; padding:12px 6px; }
@@ -154,6 +158,7 @@
   $('changeSetup').onclick = () => { stopCamera(); showSetup(); };
 
   /* ---------- Counts ---------- */
+  const side = c => c.indexOf('Girls') === 0 ? 'girls' : 'boys'; // pink or blue, like the printed codes
   let counts = {};
   function renderCounts() {
     const box = $('counts');
@@ -161,6 +166,7 @@
     let total = 0;
     CATEGORIES.forEach(c => {
       const d = document.createElement('div');
+      d.className = side(c);
       d.innerHTML = '<span></span><b></b>';
       d.firstChild.textContent = c;
       d.lastChild.textContent = c in counts ? counts[c] : '–';
@@ -181,6 +187,7 @@
   CATEGORIES.forEach(c => {
     const b = document.createElement('button');
     b.textContent = c;
+    b.className = side(c);
     b.onclick = () => record(c);
     $('manual').append(b);
   });
