@@ -166,7 +166,7 @@
       else if (r.error === 'wrong_passcode') status('The passcode was changed. Tap "Change passcode".', true);
     } catch (e) { /* try again next time */ }
   }
-  setInterval(() => { if (!$('app').hidden && !document.hidden) refresh(); }, 30000);
+  setInterval(() => { if (!$('app').hidden && !document.hidden) refresh(); }, 20000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('app').hidden) refresh(); });
 
   /* ---------- Beep + buzz ---------- */
