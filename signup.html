@@ -44,6 +44,45 @@
   #recent li.done { opacity:.55; }
   #recent button { font-size:13px; padding:4px 10px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--fg); }
   .link { background:none; border:0; color:var(--muted); font-size:13px; text-decoration:underline; padding:0; align-self:center; }
+  .foot { display:flex; justify-content:center; gap:22px; }
+  /* Admin login box */
+  #adminBox { position:fixed; inset:0; background:rgba(29,36,32,.55); display:flex; align-items:center; justify-content:center; padding:16px; z-index:20; }
+  #adminBox .card { width:100%; max-width:340px; }
+  #adminBox .row { display:flex; gap:8px; }
+  #adminBox .row .btn { flex:1; }
+  .btn.alt { background:var(--card); color:var(--fg); border:1px solid var(--line); font-weight:500; }
+  #adminMsg { font-size:14px; color:var(--red); min-height:18px; }
+  /* Admin page */
+  #admin { display:flex; flex-direction:column; gap:14px; }
+  .sw { flex-direction:row; align-items:center; justify-content:space-between; gap:12px; }
+  .sw .state { font-size:20px; font-weight:700; }
+  .sw.on { border-color:var(--green); background:#e8f3ec; } .sw.on .state { color:var(--green); }
+  .sw.off { border-color:var(--red); background:#fbeceb; } .sw.off .state { color:var(--red); }
+  .sw .btn { width:auto; padding:12px 18px; }
+  .tiles { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  .tile .n { font-size:28px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .tile .l { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .tile .s { font-size:12px; color:var(--muted); margin-top:2px; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:4px; }
+  .dot.girls { background:var(--girls); } .dot.boys { background:var(--boys); }
+  .card h3 { margin:0; font-size:15px; }
+  .card .sub { margin:0; font-size:12px; color:var(--muted); }
+  .legend { display:flex; gap:14px; font-size:12px; color:var(--muted); }
+  #kDays { display:flex; flex-direction:column; gap:8px; }
+  .day { display:grid; grid-template-columns:86px 1fr 34px; align-items:center; gap:8px; font-size:13px; }
+  .day .bar { display:flex; height:16px; border-radius:0 4px 4px 0; overflow:hidden; background:transparent; }
+  .day .bar .g { background:var(--girls); } .day .bar .b { background:var(--boys); }
+  .day .bar .g + .b { border-left:2px solid var(--card); }
+  .day .n { text-align:right; font-weight:600; font-variant-numeric:tabular-nums; }
+  .day.today .d, .day.today .n { color:var(--green); font-weight:700; }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  th { text-align:left; font-size:12px; color:var(--muted); font-weight:600; padding:6px; border-bottom:1px solid var(--line); }
+  td { padding:7px 6px; border-bottom:1px solid var(--line); font-size:15px; }
+  td.num, th.num { text-align:right; }
+  td.zero { color:#b7beb9; }
+  tr.total td { font-weight:700; border-bottom:0; }
+  .card select { padding:6px; font-size:14px; border:1px solid var(--line); border-radius:6px; background:var(--card); }
   [hidden] { display:none !important; }
 </style>
 </head>
@@ -63,13 +102,52 @@
   </div>
 
   <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
-    <div class="card" id="off" hidden>Sign-ups are turned off right now.<small>A leader can turn them back on in the Sheet (App Settings tab).</small></div>
+    <div class="card" id="off" hidden>Sign-ups are turned off right now.<small>A leader can turn them back on with Admin login below.</small></div>
     <div id="cats"></div>
     <div id="status"></div>
     <ul id="recent"></ul>
-    <button class="link" id="changeSetup">Change passcode</button>
+    <div class="foot">
+      <button class="link" id="changeSetup">Change passcode</button>
+      <button class="link" id="adminLink">Admin login</button>
+    </div>
+  </div>
+
+  <!-- Admin page: On/Off switch and KPIs (needs the admin passcode, works while sign-ups are off) -->
+  <div id="admin" hidden>
+    <div class="card sw" id="sw"><div><div class="lbl">Sign-up app</div><div class="state" id="swState"></div></div><button class="btn" id="swBtn"></button></div>
+    <div class="tiles">
+      <div class="tile"><div class="n" id="kTotal">–</div><div class="l">Overall total</div><div class="s" id="kTotalS"></div></div>
+      <div class="tile"><div class="n" id="kToday">–</div><div class="l">Today</div><div class="s" id="kTodayS"></div></div>
+      <div class="tile"><div class="n" id="kAvg">–</div><div class="l">Daily average</div><div class="s" id="kAvgS"></div></div>
+      <div class="tile"><div class="n" id="kBest">–</div><div class="l">Best day</div><div class="s" id="kBestS"></div></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div><h3>Sign-ups per day</h3><p class="sub">Day totals, girls and boys.</p></div>
+        <div class="legend"><span><span class="dot girls"></span>Girls</span><span><span class="dot boys"></span>Boys</span></div>
+      </div>
+      <div id="kDays"></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div><h3>By age</h3><p class="sub">Girls and boys in each age group.</p></div>
+        <select id="kDay"></select>
+      </div>
+      <div id="kAges"></div>
+    </div>
+    <div id="adminStatus" style="font-size:13px;color:var(--muted);text-align:center"></div>
+    <button class="btn alt" id="adminBack">← Back to sign-ups</button>
   </div>
 </main>
+
+<div id="adminBox" hidden>
+  <div class="card">
+    <div class="lbl">Admin login</div>
+    <div><label for="adminCode">Admin passcode</label><input id="adminCode" type="password" inputmode="numeric" autocomplete="off"></div>
+    <div id="adminMsg"></div>
+    <div class="row"><button class="btn alt" id="adminCancel">Cancel</button><button class="btn" id="adminGo">Open</button></div>
+  </div>
+</div>
 
 <script>
   /* ====== Same Apps Script web app URL as index.html ====== */
@@ -102,8 +180,8 @@
   }
 
   /* ---------- One-time setup ---------- */
-  function showSetup() { $('setPass').value = pass; $('setup').hidden = false; $('app').hidden = true; }
-  function showApp() { $('setup').hidden = true; $('app').hidden = false; refresh(); }
+  function showSetup() { $('setPass').value = pass; $('setup').hidden = false; $('app').hidden = true; $('admin').hidden = true; }
+  function showApp() { $('setup').hidden = true; $('admin').hidden = true; $('app').hidden = false; refresh(); }
 
   $('setSave').onclick = async () => {
     const p = $('setPass').value.trim();
@@ -266,6 +344,114 @@
       b.onclick = retry;
       right.append(' ', b);
     }
+  }
+
+  /* ---------- Admin login: the Sheet checks the code (App Settings → Admin passcode) ---------- */
+  let adminCode = '', adminData = null, adminDay = 'all';
+  const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
+  const adminErr = e => e === 'wrong_admin_code' ? 'That admin passcode isn\'t right.'
+    : e === 'admin_locked' ? 'Too many wrong tries. Wait 15 minutes and try again.'
+    : e === 'wrong_passcode' ? 'The phone passcode was changed. Tap "Change passcode" first.'
+    : 'The Sheet answered with an error: ' + e;
+
+  $('adminLink').onclick = () => { $('adminCode').value = ''; $('adminMsg').textContent = ''; $('adminBox').hidden = false; $('adminCode').focus(); };
+  $('adminCancel').onclick = () => { $('adminBox').hidden = true; };
+  $('adminCode').onkeydown = e => { if (e.key === 'Enter') $('adminGo').click(); };
+  $('adminGo').onclick = async () => {
+    const code = $('adminCode').value.trim();
+    if (!code) { $('adminMsg').textContent = 'Type the admin passcode.'; return; }
+    $('adminGo').disabled = true;
+    $('adminMsg').textContent = '';
+    try {
+      const r = await api({ action: 'adminData', adminCode: code });
+      if (r.ok) { adminCode = code; $('adminBox').hidden = true; showAdmin(r); }
+      else $('adminMsg').textContent = adminErr(r.error);
+    } catch (e) { $('adminMsg').textContent = 'Couldn\'t reach the Sheet. Check the internet connection.'; }
+    $('adminGo').disabled = false;
+  };
+  $('adminBack').onclick = () => { adminCode = ''; adminData = null; showApp(); };
+
+  function showAdmin(d) { $('app').hidden = true; $('admin').hidden = false; window.scrollTo(0, 0); renderAdmin(d); }
+  async function adminRefresh() {
+    try {
+      const r = await api({ action: 'adminData', adminCode: adminCode });
+      if (r.ok) renderAdmin(r); else $('adminStatus').textContent = adminErr(r.error);
+    } catch (e) { /* try again next time */ }
+  }
+  setInterval(() => { if (!$('admin').hidden && !document.hidden) adminRefresh(); }, 20000);
+
+  $('swBtn').onclick = async () => {
+    const on = !adminData.active;
+    if (!on && !confirm('Turn sign-ups OFF?\n\nPhones will stop adding and undoing until you turn them back on.')) return;
+    $('swBtn').disabled = true;
+    try {
+      const r = await api({ action: 'adminSwitch', adminCode: adminCode, on: on });
+      if (r.ok) renderAdmin(r); else $('adminStatus').textContent = adminErr(r.error);
+    } catch (e) { $('adminStatus').textContent = 'Couldn\'t reach the Sheet. Try again.'; }
+    $('swBtn').disabled = false;
+  };
+
+  const dateOf = k => { const p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); };
+  const dayLabel = k => dateOf(k).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const split = (g, b) => '<span class="dot girls"></span>' + g + ' &nbsp; <span class="dot boys"></span>' + b;
+
+  function renderAdmin(d) {
+    adminData = d;
+    active = d.active; render(); // keep the sign-up screen in step
+    $('sw').className = 'card sw ' + (d.active ? 'on' : 'off');
+    $('swState').textContent = d.active ? 'ON' : 'OFF';
+    $('swBtn').textContent = d.active ? 'Turn off' : 'Turn on';
+    $('adminStatus').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ' · refreshes every 20 seconds';
+
+    const byDay = {}, days = [];
+    let girls = 0;
+    d.entries.forEach(x => {
+      if (!byDay[x.d]) { byDay[x.d] = { g: 0, b: 0 }; days.push(x.d); }
+      if (side(x.c) === 'girls') { byDay[x.d].g++; girls++; } else byDay[x.d].b++;
+    });
+    days.sort();
+    const t = byDay[d.today] || { g: 0, b: 0 };
+    $('kTotal').textContent = d.entries.length;
+    $('kTotalS').innerHTML = split(girls, d.entries.length - girls);
+    $('kToday').textContent = t.g + t.b;
+    $('kTodayS').innerHTML = split(t.g, t.b);
+    $('kAvg').textContent = days.length ? Math.round(d.entries.length / days.length * 10) / 10 : '–';
+    $('kAvgS').textContent = days.length ? 'over ' + days.length + (days.length === 1 ? ' day' : ' days') : 'No sign-ups yet';
+    let best = null;
+    days.forEach(k => { const n = byDay[k].g + byDay[k].b; if (!best || n > best.n) best = { k, n }; });
+    $('kBest').textContent = best ? best.n : '–';
+    $('kBestS').textContent = best ? dayLabel(best.k) : '';
+
+    const max = Math.max(1, ...days.map(k => byDay[k].g + byDay[k].b));
+    $('kDays').innerHTML = days.length ? days.slice().reverse().map(k => {
+      const x = byDay[k];
+      return '<div class="day' + (k === d.today ? ' today' : '') + '"><span class="d">' + dayLabel(k) + '</span>' +
+        '<span class="bar" style="width:' + ((x.g + x.b) / max * 100) + '%">' +
+        (x.g ? '<span class="g" style="flex:' + x.g + '"></span>' : '') + (x.b ? '<span class="b" style="flex:' + x.b + '"></span>' : '') +
+        '</span><span class="n">' + (x.g + x.b) + '</span></div>';
+    }).join('') : '<div class="sub">No sign-ups yet.</div>';
+
+    if (adminDay !== 'all' && days.indexOf(adminDay) < 0) adminDay = 'all';
+    $('kDay').innerHTML = '<option value="all">All days</option>' + days.slice().reverse().map(k =>
+      '<option value="' + k + '">' + dayLabel(k) + (k === d.today ? ' (today)' : '') + '</option>').join('');
+    $('kDay').value = adminDay;
+    renderAges();
+  }
+  $('kDay').onchange = () => { adminDay = $('kDay').value; renderAges(); };
+
+  function renderAges() {
+    const rows = {};
+    AGES.forEach(a => { rows[a] = { g: 0, b: 0 }; });
+    adminData.entries.forEach(x => {
+      if (adminDay !== 'all' && x.d !== adminDay) return;
+      const r = rows[x.c.replace(/^(Girls|Boys) /, '')];
+      if (r) { if (side(x.c) === 'girls') r.g++; else r.b++; }
+    });
+    const num = n => '<td class="num' + (n ? '' : ' zero') + '">' + n + '</td>';
+    let tg = 0, tb = 0;
+    $('kAges').innerHTML = '<table><tr><th>Age</th><th class="num"><span class="dot girls"></span>Girls</th><th class="num"><span class="dot boys"></span>Boys</th><th class="num">Total</th></tr>' +
+      AGES.map(a => { const r = rows[a]; tg += r.g; tb += r.b; return '<tr><td>' + a + '</td>' + num(r.g) + num(r.b) + num(r.g + r.b) + '</tr>'; }).join('') +
+      '<tr class="total"><td>Total</td>' + num(tg) + num(tb) + num(tg + tb) + '</tr></table>';
   }
 
   /* ---------- Start ---------- */
