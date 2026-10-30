@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Toy Drive Sign-ups</title>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   :root { --bg:#f6f7f4; --card:#fff; --fg:#1d2420; --muted:#5f6b64; --red:#b3261e; --green:#1f6b45; --line:#d9ded8; --girls:#c2185b; --boys:#1565c0; }
   * { box-sizing: border-box; }
@@ -12,43 +11,39 @@
   header { background:var(--green); color:#fff; padding:14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left)); padding-top: max(14px, env(safe-area-inset-top)); display:flex; justify-content:space-between; align-items:center; gap:12px; }
   header h1 { font-size:18px; margin:0; }
   .hright { text-align:right; line-height:1.25; font-size:13px; }
-  main { padding:16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); display:flex; flex-direction:column; gap:14px; max-width:520px; margin:0 auto; }
-  #reader { width:100%; border-radius:10px; overflow:hidden; background:#000; }
-  #reader video { border-radius:10px; }
+  main { padding:16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); display:flex; flex-direction:column; gap:14px; max-width:560px; margin:0 auto; }
   .btn { display:block; width:100%; padding:14px; font-size:16px; border-radius:10px; border:0; background:var(--red); color:#fff; font-weight:600; text-align:center; cursor:pointer; }
   .btn.alt { background:var(--card); color:var(--fg); border:1px solid var(--line); font-weight:500; }
   .btn:disabled { opacity:.6; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px; }
   label, .lbl { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
   input { width:100%; padding:10px; font-size:16px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
-  #status { font-size:14px; color:var(--muted); min-height:20px; }
+  #status { font-size:14px; color:var(--muted); min-height:20px; text-align:center; }
   #status.err { color:var(--red); }
-  #last { text-align:center; padding:18px 14px; }
-  #last .cat { font-size:28px; font-weight:700; }
-  #last .qty { font-size:16px; color:var(--muted); }
+  #last { text-align:center; padding:12px 14px; gap:2px; }
+  #last .cat { font-size:22px; font-weight:700; }
+  #last .qty { font-size:15px; color:var(--muted); }
   #last.ok { border-color:var(--green); background:#e8f3ec; }
   #last.ok .cat { color:var(--green); }
   #last.bad { border-color:var(--red); background:#fbeceb; }
   #last.bad .cat { color:var(--red); }
-  .grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; }
-  .grid div, .grid button { display:flex; justify-content:space-between; padding:8px 10px; font-size:15px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); font-variant-numeric: tabular-nums; }
-  .grid b { font-weight:700; }
-  .grid .girls { border-left:5px solid var(--girls); }
-  .grid .boys { border-left:5px solid var(--boys); }
-  details .grid .girls { color:var(--girls); }
-  details .grid .boys { color:var(--boys); }
-  details summary { cursor:pointer; font-size:14px; color:var(--muted); padding:4px 0; }
-  details .grid { margin-top:8px; }
-  details .grid button { justify-content:center; padding:12px 6px; }
+  /* Girls down the left, Boys down the right. */
+  #cats { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(6, auto); grid-auto-flow:column; gap:10px; }
+  #cats button { min-height:72px; border:0; border-radius:12px; color:#fff; font-size:20px; font-weight:700; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; touch-action:manipulation; }
+  #cats button .n { font-size:14px; font-weight:500; opacity:.9; font-variant-numeric: tabular-nums; }
+  #cats button.girls { background:var(--girls); }
+  #cats button.boys { background:var(--boys); }
+  #cats button:active { transform:scale(.97); }
+  #cats button.flash { animation: flash .6s; }
+  @keyframes flash { from { box-shadow: 0 0 0 5px #f2c94c; } to { box-shadow: 0 0 0 0 transparent; } }
   #recent { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
   #recent li { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:14px; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-variant-numeric: tabular-nums; }
   #recent .st { font-size:12px; color:var(--muted); }
   #recent .st.ok { color:var(--green); }
   #recent .st.bad { color:var(--red); }
   #recent button { font-size:13px; padding:4px 10px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--fg); }
-  .flash { animation: flash .6s; }
-  @keyframes flash { from { box-shadow: 0 0 0 5px var(--green); } to { box-shadow: 0 0 0 0 transparent; } }
-  .link { background:none; border:0; color:var(--muted); font-size:13px; text-decoration:underline; padding:0; align-self:center; }
+  .links { display:flex; justify-content:center; gap:20px; }
+  .link { background:none; border:0; color:var(--muted); font-size:13px; text-decoration:underline; padding:0; }
   [hidden] { display:none !important; }
 </style>
 </head>
@@ -69,29 +64,19 @@
   </div>
 
   <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
-    <div class="card" id="last"><div class="cat">Ready</div><div class="qty">Scan the QR code for the box you hand out.</div></div>
+    <div class="card" id="last"><div class="cat">Ready</div><div class="qty">Tap the box you hand out.</div></div>
 
-    <div id="reader"></div>
-    <button class="btn" id="startBtn">Start scanning</button>
-    <button class="btn alt" id="stopBtn" hidden>Stop camera</button>
-    <div id="status">Tap Start scanning and point the camera at a sign-up QR code.</div>
+    <div id="cats"></div>
+    <div id="status"></div>
 
     <button class="btn alt" id="undoBtn" hidden></button>
 
     <ul id="recent"></ul>
 
-    <div class="card">
-      <div class="lbl">Sign-ups so far</div>
-      <div class="grid" id="counts"></div>
-      <button class="link" id="refresh">Refresh</button>
+    <div class="links">
+      <button class="link" id="refresh">Refresh counts</button>
+      <button class="link" id="changeSetup">Change name or passcode</button>
     </div>
-
-    <details>
-      <summary>Code won't scan? Tap the category instead</summary>
-      <div class="grid" id="manual"></div>
-    </details>
-
-    <button class="link" id="changeSetup">Change name or passcode</button>
   </div>
 </main>
 
@@ -100,13 +85,12 @@
   const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyRL1KZmp1m3G1k4KW46NkgeCnMRR6iosK-SmNu0Dv3GWi-fAs9FcpOUVwpZcxV0uAH/exec';
   /* ======================================================== */
 
-  const APP_VERSION = 'sign-ups v1';
-  // Must match SIGNUP_CATEGORIES in the toy drive app and the list in codes.html.
+  const APP_VERSION = 'sign-ups v2';
+  // Must match SIGNUP_CATEGORIES in the toy drive app.
   const CATEGORIES = [
     'Girls 0-2', 'Girls 3-5', 'Girls 6-8', 'Girls 9-11', 'Girls 12-14', 'Girls 15-18',
     'Boys 0-2', 'Boys 3-5', 'Boys 6-8', 'Boys 9-11', 'Boys 12-14', 'Boys 15-18'
   ];
-  const PREFIX = 'SIGNUP:';
 
   const $ = id => document.getElementById(id);
   const status = (t, err) => { $('status').textContent = t; $('status').classList.toggle('err', !!err); };
@@ -155,22 +139,24 @@
     }
     $('setSave').disabled = false;
   };
-  $('changeSetup').onclick = () => { stopCamera(); showSetup(); };
+  $('changeSetup').onclick = () => showSetup();
 
-  /* ---------- Counts ---------- */
-  const side = c => c.indexOf('Girls') === 0 ? 'girls' : 'boys'; // pink or blue, like the printed codes
+  /* ---------- Category buttons with counts ---------- */
   let counts = {};
+  const buttons = {};
+  CATEGORIES.forEach(c => {
+    const b = document.createElement('button');
+    b.className = c.indexOf('Girls') === 0 ? 'girls' : 'boys';
+    b.innerHTML = '<span class="c"></span><span class="n"></span>';
+    b.querySelector('.c').textContent = c;
+    b.onclick = () => tap(c);
+    buttons[c] = b;
+    $('cats').append(b);
+  });
   function renderCounts() {
-    const box = $('counts');
-    box.innerHTML = '';
     let total = 0;
     CATEGORIES.forEach(c => {
-      const d = document.createElement('div');
-      d.className = side(c);
-      d.innerHTML = '<span></span><b></b>';
-      d.firstChild.textContent = c;
-      d.lastChild.textContent = c in counts ? counts[c] : '–';
-      box.append(d);
+      buttons[c].querySelector('.n').textContent = c in counts ? counts[c] + ' signed up' : '…';
       total += counts[c] || 0;
     });
     $('count').textContent = total + ' signed up';
@@ -180,23 +166,16 @@
     try {
       const r = await api({ action: 'signups' });
       if (r.ok) { counts = r.counts; renderCounts(); }
-    } catch (e) { /* counts stay as they were */ }
+      else if (r.error === 'wrong_passcode') status('The passcode was changed. Tap "Change name or passcode".', true);
+    } catch (e) { status('Couldn\'t load the counts. Check the internet connection.', true); }
   }
   $('refresh').onclick = loadCounts;
 
-  CATEGORIES.forEach(c => {
-    const b = document.createElement('button');
-    b.textContent = c;
-    b.className = side(c);
-    b.onclick = () => record(c);
-    $('manual').append(b);
-  });
-
-  /* ---------- Beep (needs a tap first on iPhone) ---------- */
+  /* ---------- Beep + buzz (sound needs a tap first on iPhone) ---------- */
   let audio = null;
   function beep(ok) {
-    if (navigator.vibrate) navigator.vibrate(ok ? 60 : [60, 60, 60]);
-    if (!audio) return;
+    if (navigator.vibrate) navigator.vibrate(ok ? 50 : [60, 60, 60]);
+    try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch (e) { return; }
     const o = audio.createOscillator(), g = audio.createGain();
     o.frequency.value = ok ? 1100 : 300;
     g.gain.setValueAtTime(0.15, audio.currentTime);
@@ -204,63 +183,20 @@
     o.connect(g); g.connect(audio.destination);
     o.start(); o.stop(audio.currentTime + 0.16);
   }
-  function unlockAudio() {
-    try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch (e) {}
-  }
-
-  /* ---------- Live camera (QR codes only, so toy barcodes are ignored) ---------- */
-  let scanner = null, lastCode = '', lastSeen = 0;
-  $('startBtn').onclick = async () => {
-    unlockAudio();
-    try {
-      scanner = scanner || new Html5Qrcode('reader', {
-        formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-        verbose: false
-      });
-      await scanner.start(
-        { facingMode: 'environment' },
-        { fps: 12, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.75); return { width: s, height: s }; } },
-        code => onScan(code)
-      );
-      $('startBtn').hidden = true; $('stopBtn').hidden = false;
-      status('Scanning. Hold a sign-up code in the box until it beeps.');
-    } catch (e) {
-      status('The camera didn\'t start. Allow camera access when asked, or tap the category below. (' + (e && e.message ? e.message : e) + ')', true);
-    }
-  };
-  $('stopBtn').onclick = () => stopCamera();
-  function stopCamera() {
-    if (scanner && scanner.isScanning) scanner.stop().catch(() => {});
-    $('startBtn').hidden = false; $('stopBtn').hidden = true;
-  }
-
-  function onScan(text) {
-    text = String(text).trim();
-    const now = Date.now();
-    // The same code counts again only after it has been out of view for a moment,
-    // so holding one code in front of the camera adds 1, not 10.
-    const repeat = text === lastCode && now - lastSeen < 2000;
-    lastCode = text; lastSeen = now;
-    if (repeat) return;
-    const cat = text.indexOf(PREFIX) === 0 ? text.slice(PREFIX.length) : '';
-    if (CATEGORIES.indexOf(cat) < 0) {
-      showLast('Not a sign-up code', 'Scan one of the printed sign-up QR codes.', 'bad');
-      beep(false);
-      return;
-    }
-    record(cat);
-  }
 
   /* ---------- Add 1 (or undo) ---------- */
   const undoStack = []; // categories this phone added, newest last
+  const lastTap = {};
 
-  async function record(cat) {
-    unlockAudio();
+  function tap(cat) {
+    const now = Date.now();
+    if (now - (lastTap[cat] || 0) < 700) return; // an accidental double tap counts once
+    lastTap[cat] = now;
     beep(true);
+    const b = buttons[cat];
+    b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
     showLast(cat, 'Saving…', 'ok');
-    const li = addRecent(cat);
-    await send(cat, li);
+    send(cat, addRecent(cat));
   }
 
   async function send(cat, li) {
@@ -273,17 +209,16 @@
         showLast(cat, 'Added · now ' + r.qty, 'ok');
         undoStack.push({ cat, li });
         updateUndo();
-        status('Saved. Scan the next box.');
+        status('');
         return;
       }
       if (r.error === 'wrong_passcode') {
         setRecent(li, 'Wrong passcode', 'bad', cat);
-        showLast(cat, 'Not saved', 'bad');
         status('The passcode was changed. Tap "Change name or passcode".', true);
       } else {
         setRecent(li, 'Not saved', 'bad', cat);
-        showLast(cat, 'Not saved: ' + r.error, 'bad');
       }
+      showLast(cat, 'Not saved. Tap Retry below.', 'bad');
     } catch (e) {
       setRecent(li, 'No connection', 'bad', cat);
       showLast(cat, 'Not saved: no connection. Tap Retry below.', 'bad');
@@ -294,7 +229,7 @@
   function updateUndo() {
     const top = undoStack[undoStack.length - 1];
     $('undoBtn').hidden = !top;
-    if (top) $('undoBtn').textContent = '↩ Undo last scan (' + top.cat + ')';
+    if (top) $('undoBtn').textContent = '↩ Undo last (' + top.cat + ')';
   }
   $('undoBtn').onclick = async () => {
     const top = undoStack[undoStack.length - 1];
@@ -307,7 +242,7 @@
         counts[top.cat] = r.qty; renderCounts();
         setRecent(top.li, 'Undone · now ' + r.qty, '');
         showLast(top.cat, 'Undone · now ' + r.qty, '');
-        status('Undid the last scan.');
+        status('');
         updateUndo();
       } else {
         status('Couldn\'t undo: ' + r.error, true);
@@ -323,17 +258,15 @@
     box.className = 'card' + (cls ? ' ' + cls : '');
     box.querySelector('.cat').textContent = cat;
     box.querySelector('.qty').textContent = text;
-    void box.offsetWidth; // restart the flash
-    if (cls === 'ok') box.classList.add('flash');
   }
 
-  /* ---------- Recent scans list (last 8) ---------- */
+  /* ---------- Recent taps list (last 5) ---------- */
   function addRecent(cat) {
     const li = document.createElement('li');
     li.innerHTML = '<span class="code"></span><span class="right"><span class="st"></span></span>';
     li.querySelector('.code').textContent = cat;
     $('recent').prepend(li);
-    while ($('recent').children.length > 8) $('recent').lastChild.remove();
+    while ($('recent').children.length > 5) $('recent').lastChild.remove();
     return li;
   }
   function setRecent(li, text, cls, retryCat) {
