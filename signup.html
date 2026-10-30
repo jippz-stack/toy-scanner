@@ -3,80 +3,71 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Toy Drive Sign-ups</title>
+<title>Wonder Box Outreach</title>
 <style>
   :root { --bg:#f6f7f4; --card:#fff; --fg:#1d2420; --muted:#5f6b64; --red:#b3261e; --green:#1f6b45; --line:#d9ded8; --girls:#c2185b; --boys:#1565c0; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--fg); -webkit-tap-highlight-color: transparent; }
   header { background:var(--green); color:#fff; padding:14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left)); padding-top: max(14px, env(safe-area-inset-top)); display:flex; justify-content:space-between; align-items:center; gap:12px; }
   header h1 { font-size:18px; margin:0; }
-  .hright { text-align:right; line-height:1.25; font-size:13px; }
+  .hright { text-align:right; line-height:1.3; font-size:13px; font-variant-numeric: tabular-nums; white-space:nowrap; }
   main { padding:16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); display:flex; flex-direction:column; gap:14px; max-width:560px; margin:0 auto; }
   .btn { display:block; width:100%; padding:14px; font-size:16px; border-radius:10px; border:0; background:var(--red); color:#fff; font-weight:600; text-align:center; cursor:pointer; }
-  .btn.alt { background:var(--card); color:var(--fg); border:1px solid var(--line); font-weight:500; }
   .btn:disabled { opacity:.6; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px; }
   label, .lbl { font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
   input { width:100%; padding:10px; font-size:16px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
-  #status { font-size:14px; color:var(--muted); min-height:20px; text-align:center; }
+  #status { font-size:14px; color:var(--muted); text-align:center; }
+  #status:empty { display:none; }
   #status.err { color:var(--red); }
-  #last { text-align:center; padding:12px 14px; gap:2px; }
-  #last .cat { font-size:22px; font-weight:700; }
-  #last .qty { font-size:15px; color:var(--muted); }
-  #last.ok { border-color:var(--green); background:#e8f3ec; }
-  #last.ok .cat { color:var(--green); }
-  #last.bad { border-color:var(--red); background:#fbeceb; }
-  #last.bad .cat { color:var(--red); }
+  #off { background:#fbeceb; border-color:var(--red); color:var(--red); text-align:center; font-weight:600; }
+  #off small { display:block; font-weight:400; color:var(--muted); margin-top:4px; }
   /* Girls down the left, Boys down the right. */
   #cats { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(6, auto); grid-auto-flow:column; gap:10px; }
-  #cats button { min-height:72px; border:0; border-radius:12px; color:#fff; font-size:20px; font-weight:700; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; touch-action:manipulation; }
-  #cats button .n { font-size:14px; font-weight:500; opacity:.9; font-variant-numeric: tabular-nums; }
+  #cats button { min-height:76px; border:0; border-radius:12px; color:#fff; font-size:20px; font-weight:700; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; touch-action:manipulation; }
+  #cats button .n { font-size:15px; font-weight:600; opacity:.95; font-variant-numeric: tabular-nums; }
   #cats button.girls { background:var(--girls); }
   #cats button.boys { background:var(--boys); }
   #cats button:active { transform:scale(.97); }
-  #cats button.flash { animation: flash .6s; }
-  @keyframes flash { from { box-shadow: 0 0 0 5px #f2c94c; } to { box-shadow: 0 0 0 0 transparent; } }
+  #cats button.flash { animation: flash 1.6s ease-out; }
+  @keyframes flash { 0%, 55% { box-shadow: 0 0 0 6px #f2c94c; } 100% { box-shadow: 0 0 0 0 transparent; } }
+  #cats.disabled button { background:#9aa39e; cursor:not-allowed; }
   #recent { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
-  #recent li { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:14px; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-variant-numeric: tabular-nums; }
-  #recent .st { font-size:12px; color:var(--muted); }
-  #recent .st.ok { color:var(--green); }
+  #recent li { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:15px; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-variant-numeric: tabular-nums; }
+  #recent li.girls { border-left:5px solid var(--girls); }
+  #recent li.boys { border-left:5px solid var(--boys); }
+  #recent li.undoable { cursor:pointer; }
+  #recent .when { color:var(--muted); font-size:13px; margin-left:6px; }
+  #recent .st { font-size:13px; color:var(--muted); }
+  #recent .st.tap { color:var(--fg); text-decoration:underline; }
   #recent .st.bad { color:var(--red); }
+  #recent li.done { opacity:.55; }
   #recent button { font-size:13px; padding:4px 10px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--fg); }
-  .links { display:flex; justify-content:center; gap:20px; }
-  .link { background:none; border:0; color:var(--muted); font-size:13px; text-decoration:underline; padding:0; }
+  .link { background:none; border:0; color:var(--muted); font-size:13px; text-decoration:underline; padding:0; align-self:center; }
   [hidden] { display:none !important; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Toy Drive Sign-ups</h1>
-  <div class="hright"><div id="ver"></div><div id="count"></div></div>
+  <h1>Wonder Box Outreach</h1>
+  <div class="hright"><div id="today"></div><div id="total"></div></div>
 </header>
 
 <main>
-  <!-- One-time setup on each phone (shared with the toy scanner page) -->
+  <!-- One-time setup on each phone (same passcode as the toy scanner) -->
   <div class="card" id="setup" hidden>
     <div class="lbl">Set up this phone</div>
-    <div><label for="setName">Your name</label><input id="setName" autocomplete="name" placeholder="e.g. Maria"></div>
     <div><label for="setPass">Passcode</label><input id="setPass" autocomplete="off" placeholder="Ask the toy drive leader"></div>
     <button class="btn" id="setSave">Continue</button>
     <div id="setMsg" class="st"></div>
   </div>
 
   <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
-    <div class="card" id="last"><div class="cat">Ready</div><div class="qty">Tap the box you hand out.</div></div>
-
+    <div class="card" id="off" hidden>Sign-ups are turned off right now.<small>A leader can turn them back on in the Sheet (App Settings tab).</small></div>
     <div id="cats"></div>
     <div id="status"></div>
-
-    <button class="btn alt" id="undoBtn" hidden></button>
-
     <ul id="recent"></ul>
-
-    <div class="links">
-      <button class="link" id="refresh">Refresh counts</button>
-      <button class="link" id="changeSetup">Change name or passcode</button>
-    </div>
+    <button class="link" id="changeSetup">Change passcode</button>
   </div>
 </main>
 
@@ -85,7 +76,6 @@
   const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyRL1KZmp1m3G1k4KW46NkgeCnMRR6iosK-SmNu0Dv3GWi-fAs9FcpOUVwpZcxV0uAH/exec';
   /* ======================================================== */
 
-  const APP_VERSION = 'sign-ups v2';
   // Must match SIGNUP_CATEGORIES in the toy drive app.
   const CATEGORIES = [
     'Girls 0-2', 'Girls 3-5', 'Girls 6-8', 'Girls 9-11', 'Girls 12-14', 'Girls 15-18',
@@ -93,47 +83,38 @@
   ];
 
   const $ = id => document.getElementById(id);
-  const status = (t, err) => { $('status').textContent = t; $('status').classList.toggle('err', !!err); };
-  $('ver').textContent = APP_VERSION;
+  const status = (t, err) => { $('status').textContent = t || ''; $('status').classList.toggle('err', !!err); };
+  const side = c => c.indexOf('Girls') === 0 ? 'girls' : 'boys';
 
   const store = {
     get(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   };
-  let settings = { name: store.get('tds_name'), pass: store.get('tds_pass') };
+  let pass = store.get('tds_pass');
 
   async function api(body) {
     const res = await fetch(SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight Apps Script can't answer
-      body: JSON.stringify(Object.assign({ passcode: settings.pass }, body))
+      body: JSON.stringify(Object.assign({ passcode: pass }, body))
     });
     return res.json();
   }
 
   /* ---------- One-time setup ---------- */
-  function showSetup() {
-    $('setName').value = settings.name;
-    $('setPass').value = settings.pass;
-    $('setup').hidden = false;
-    $('app').hidden = true;
-  }
-  function showApp() { $('setup').hidden = true; $('app').hidden = false; loadCounts(); }
+  function showSetup() { $('setPass').value = pass; $('setup').hidden = false; $('app').hidden = true; }
+  function showApp() { $('setup').hidden = true; $('app').hidden = false; refresh(); }
 
   $('setSave').onclick = async () => {
-    const name = $('setName').value.trim(), pass = $('setPass').value.trim();
-    if (!name || !pass) { $('setMsg').textContent = 'Enter your name and the passcode.'; return; }
+    const p = $('setPass').value.trim();
+    if (!p) { $('setMsg').textContent = 'Enter the passcode.'; return; }
     $('setSave').disabled = true;
     $('setMsg').textContent = 'Checking…';
-    settings = { name, pass };
+    pass = p;
     try {
       const r = await api({ action: 'signups' });
-      if (r.ok) {
-        store.set('tds_name', name); store.set('tds_pass', pass);
-        showApp();
-      } else {
-        $('setMsg').textContent = r.error === 'wrong_passcode' ? 'That passcode isn\'t right. Check with the toy drive leader.' : 'The Sheet answered with an error: ' + r.error;
-      }
+      if (r.ok) { store.set('tds_pass', p); applyState(r); showApp(); }
+      else $('setMsg').textContent = r.error === 'wrong_passcode' ? 'That passcode isn\'t right. Check with the toy drive leader.' : 'The Sheet answered with an error: ' + r.error;
     } catch (e) {
       $('setMsg').textContent = 'Couldn\'t reach the Sheet. Check your internet connection and try again.';
     }
@@ -141,37 +122,54 @@
   };
   $('changeSetup').onclick = () => showSetup();
 
-  /* ---------- Category buttons with counts ---------- */
-  let counts = {};
+  /* ---------- Counts: what the Sheet last said, plus taps still on their way ---------- */
+  let sheetCounts = null, today = null, total = null, active = true;
+  const pending = {}; // category -> taps sent but not answered yet
   const buttons = {};
   CATEGORIES.forEach(c => {
+    pending[c] = 0;
     const b = document.createElement('button');
-    b.className = c.indexOf('Girls') === 0 ? 'girls' : 'boys';
+    b.className = side(c);
     b.innerHTML = '<span class="c"></span><span class="n"></span>';
     b.querySelector('.c').textContent = c;
     b.onclick = () => tap(c);
     buttons[c] = b;
     $('cats').append(b);
   });
-  function renderCounts() {
-    let total = 0;
+
+  function render() {
+    let waiting = 0;
     CATEGORIES.forEach(c => {
-      buttons[c].querySelector('.n').textContent = c in counts ? counts[c] + ' signed up' : '…';
-      total += counts[c] || 0;
+      waiting += pending[c];
+      buttons[c].querySelector('.n').textContent = sheetCounts ? (sheetCounts[c] + pending[c]) + ' signed up' : '…';
     });
-    $('count').textContent = total + ' signed up';
+    $('today').textContent = today === null ? '' : 'Today: ' + (today + waiting);
+    $('total').textContent = total === null ? '' : 'Total: ' + (total + waiting);
+    $('off').hidden = active;
+    $('cats').classList.toggle('disabled', !active);
   }
-  async function loadCounts() {
-    renderCounts();
+  function applyState(r) {
+    if (r.counts) sheetCounts = r.counts;
+    if (typeof r.today === 'number') today = r.today;
+    if (typeof r.total === 'number') total = r.total;
+    if (typeof r.active === 'boolean') active = r.active;
+    if (active && /turned off/.test($('status').textContent)) status('');
+    render();
+  }
+  render();
+
+  // Keep counts (and the on/off switch) current when other phones are adding too.
+  async function refresh() {
     try {
       const r = await api({ action: 'signups' });
-      if (r.ok) { counts = r.counts; renderCounts(); }
-      else if (r.error === 'wrong_passcode') status('The passcode was changed. Tap "Change name or passcode".', true);
-    } catch (e) { status('Couldn\'t load the counts. Check the internet connection.', true); }
+      if (r.ok) applyState(r);
+      else if (r.error === 'wrong_passcode') status('The passcode was changed. Tap "Change passcode".', true);
+    } catch (e) { /* try again next time */ }
   }
-  $('refresh').onclick = loadCounts;
+  setInterval(() => { if (!$('app').hidden && !document.hidden) refresh(); }, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('app').hidden) refresh(); });
 
-  /* ---------- Beep + buzz (sound needs a tap first on iPhone) ---------- */
+  /* ---------- Beep + buzz ---------- */
   let audio = null;
   function beep(ok) {
     if (navigator.vibrate) navigator.vibrate(ok ? 50 : [60, 60, 60]);
@@ -184,106 +182,94 @@
     o.start(); o.stop(audio.currentTime + 0.16);
   }
 
-  /* ---------- Add 1 (or undo) ---------- */
-  const undoStack = []; // categories this phone added, newest last
+  /* ---------- Tap = +1 right away, then saved to the Sheet ---------- */
   const lastTap = {};
-
   function tap(cat) {
+    if (!active) { beep(false); return; } // the red banner already says why
     const now = Date.now();
     if (now - (lastTap[cat] || 0) < 700) return; // an accidental double tap counts once
     lastTap[cat] = now;
     beep(true);
     const b = buttons[cat];
     b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
-    showLast(cat, 'Saving…', 'ok');
+    status('');
     send(cat, addRecent(cat));
   }
 
   async function send(cat, li) {
-    setRecent(li, 'Saving…', '');
-    try {
-      const r = await api({ action: 'signup', category: cat, scannedBy: settings.name });
-      if (r.ok) {
-        counts[cat] = r.qty; renderCounts();
-        setRecent(li, '+1 · now ' + r.qty, 'ok');
-        showLast(cat, 'Added · now ' + r.qty, 'ok');
-        undoStack.push({ cat, li });
-        updateUndo();
-        status('');
-        return;
-      }
-      if (r.error === 'wrong_passcode') {
-        setRecent(li, 'Wrong passcode', 'bad', cat);
-        status('The passcode was changed. Tap "Change name or passcode".', true);
-      } else {
-        setRecent(li, 'Not saved', 'bad', cat);
-      }
-      showLast(cat, 'Not saved. Tap Retry below.', 'bad');
-    } catch (e) {
-      setRecent(li, 'No connection', 'bad', cat);
-      showLast(cat, 'Not saved: no connection. Tap Retry below.', 'bad');
+    pending[cat]++; render();
+    setRecent(li, 'Saving…');
+    let r = null;
+    try { r = await api({ action: 'signup', category: cat }); } catch (e) { r = null; }
+    pending[cat]--;
+    if (r) applyState(r);
+    if (r && r.ok) {
+      li.dataset.id = r.id;
+      setRecent(li, 'Tap to undo', 'tap');
+      li.classList.add('undoable');
+      return;
     }
+    render();
     beep(false);
+    if (!r) setRecent(li, 'Not saved (no connection)', 'bad', () => send(cat, li));
+    else if (r.error === 'turned_off') { setRecent(li, 'Not saved: sign-ups are off', 'bad'); }
+    else if (r.error === 'wrong_passcode') { setRecent(li, 'Not saved', 'bad', () => send(cat, li)); status('The passcode was changed. Tap "Change passcode".', true); }
+    else setRecent(li, 'Not saved', 'bad', () => send(cat, li));
   }
 
-  function updateUndo() {
-    const top = undoStack[undoStack.length - 1];
-    $('undoBtn').hidden = !top;
-    if (top) $('undoBtn').textContent = '↩ Undo last (' + top.cat + ')';
-  }
-  $('undoBtn').onclick = async () => {
-    const top = undoStack[undoStack.length - 1];
-    if (!top) return;
-    $('undoBtn').disabled = true;
+  /* ---------- Tap a recent sign-up to undo it ---------- */
+  async function undo(li) {
+    const cat = li.dataset.cat, id = li.dataset.id;
+    if (!id || li.classList.contains('busy')) return;
+    if (!active) { status('Sign-ups are turned off, so undo is off too.', true); return; }
+    if (!confirm('Undo this sign-up?\n\n' + cat + ' at ' + li.querySelector('.when').textContent)) return;
+    li.classList.add('busy');
+    setRecent(li, 'Undoing…');
     try {
-      const r = await api({ action: 'signupUndo', category: top.cat, scannedBy: settings.name });
+      const r = await api({ action: 'signupUndo', category: cat, id: id });
+      applyState(r);
       if (r.ok) {
-        undoStack.pop();
-        counts[top.cat] = r.qty; renderCounts();
-        setRecent(top.li, 'Undone · now ' + r.qty, '');
-        showLast(top.cat, 'Undone · now ' + r.qty, '');
-        status('');
-        updateUndo();
+        li.classList.remove('undoable'); li.classList.add('done'); delete li.dataset.id;
+        setRecent(li, r.removed ? 'Undone' : 'Already undone');
       } else {
-        status('Couldn\'t undo: ' + r.error, true);
+        setRecent(li, 'Tap to undo', 'tap');
+        status(r.error === 'turned_off' ? 'Sign-ups are turned off, so undo is off too.' : 'Couldn\'t undo: ' + r.error, true);
       }
     } catch (e) {
+      setRecent(li, 'Tap to undo', 'tap');
       status('Couldn\'t undo: no connection. Try again.', true);
     }
-    $('undoBtn').disabled = false;
-  };
-
-  function showLast(cat, text, cls) {
-    const box = $('last');
-    box.className = 'card' + (cls ? ' ' + cls : '');
-    box.querySelector('.cat').textContent = cat;
-    box.querySelector('.qty').textContent = text;
+    li.classList.remove('busy');
   }
 
-  /* ---------- Recent taps list (last 5) ---------- */
+  /* ---------- Recent sign-ups list (last 10 on this phone) ---------- */
   function addRecent(cat) {
     const li = document.createElement('li');
-    li.innerHTML = '<span class="code"></span><span class="right"><span class="st"></span></span>';
+    li.className = side(cat);
+    li.dataset.cat = cat;
+    li.innerHTML = '<span><span class="code"></span><span class="when"></span></span><span class="right"></span>';
     li.querySelector('.code').textContent = cat;
+    li.querySelector('.when').textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    li.onclick = e => { if (e.target.tagName !== 'BUTTON') undo(li); };
     $('recent').prepend(li);
-    while ($('recent').children.length > 5) $('recent').lastChild.remove();
+    while ($('recent').children.length > 10) $('recent').lastChild.remove();
     return li;
   }
-  function setRecent(li, text, cls, retryCat) {
+  function setRecent(li, text, cls, retry) {
     const right = li.querySelector('.right');
     right.innerHTML = '<span class="st"></span>';
     const st = right.querySelector('.st');
     st.textContent = text; if (cls) st.classList.add(cls);
-    if (retryCat) {
+    if (retry) {
       const b = document.createElement('button');
       b.textContent = 'Retry';
-      b.onclick = () => send(retryCat, li);
+      b.onclick = retry;
       right.append(' ', b);
     }
   }
 
   /* ---------- Start ---------- */
-  if (settings.name && settings.pass) showApp(); else showSetup();
+  if (pass) showApp(); else showSetup();
 </script>
 </body>
 </html>
