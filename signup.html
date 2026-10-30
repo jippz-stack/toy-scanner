@@ -10,6 +10,12 @@
   body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--fg); -webkit-tap-highlight-color: transparent; }
   header { background:var(--green); color:#fff; padding:14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left)); padding-top: max(14px, env(safe-area-inset-top)); display:flex; justify-content:space-between; align-items:center; gap:12px; }
   header h1 { font-size:18px; margin:0; }
+  header .loc { font-size:13px; opacity:.85; margin-top:2px; }
+  #locs { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  #locs button { min-height:110px; border:0; border-radius:14px; background:var(--green); color:#fff; font-size:24px; font-weight:700; cursor:pointer; touch-action:manipulation; }
+  #locs button:nth-child(even) { background:#0f5257; }
+  #locs button:active { transform:scale(.97); }
+  #setLoc { font-size:22px; font-weight:700; color:var(--green); }
   .hright { text-align:right; line-height:1.3; font-size:13px; font-variant-numeric: tabular-nums; white-space:nowrap; }
   main { padding:16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); display:flex; flex-direction:column; gap:14px; max-width:560px; margin:0 auto; }
   .btn { display:block; width:100%; padding:14px; font-size:16px; border-radius:10px; border:0; background:var(--red); color:#fff; font-weight:600; text-align:center; cursor:pointer; }
@@ -88,20 +94,30 @@
 </head>
 <body>
 <header>
-  <h1>Wonder Box Outreach</h1>
+  <div><h1>Wonder Box Outreach</h1><div class="loc" id="hLoc"></div></div>
   <div class="hright"><div id="today"></div><div id="total"></div></div>
 </header>
 
 <main>
   <!-- Sign in: a leader types the passcode. The phone keeps only a sign-in pass, which stops
        working when sign-ups are turned off (Turn off, or automatically at midnight). -->
+  <!-- Step 1: pick the location (each location has its own Sheet and passcode) -->
+  <div class="card" id="pick" hidden>
+    <div class="lbl">Choose your location</div>
+    <div id="locs"></div>
+  </div>
+
   <div class="card" id="setup" hidden>
     <div class="lbl">Sign in this phone</div>
+    <div id="setLoc"></div>
     <div id="setWhy" class="sub"></div>
     <div><label for="setPass">Passcode</label><input id="setPass" type="password" autocomplete="off" placeholder="A leader types this in"></div>
     <button class="btn" id="setSave">Sign in</button>
     <div id="setMsg" style="font-size:14px;color:var(--red)"></div>
-    <button class="link" id="adminLink2">Admin login</button>
+    <div class="foot">
+      <button class="link" id="changeLoc">Change location</button>
+      <button class="link" id="adminLink2">Admin login</button>
+    </div>
   </div>
 
   <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
@@ -153,9 +169,12 @@
 </div>
 
 <script>
-  /* ====== Same Apps Script web app URL as index.html ====== */
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyRL1KZmp1m3G1k4KW46NkgeCnMRR6iosK-SmNu0Dv3GWi-fAs9FcpOUVwpZcxV0uAH/exec';
-  /* ======================================================== */
+  /* ====== Each location's Sheet (web app links from locations.json in the toy drive app) ====== */
+  const LOCATIONS = [
+    { name: 'Haslet', url: 'https://script.google.com/macros/s/AKfycbyRL1KZmp1m3G1k4KW46NkgeCnMRR6iosK-SmNu0Dv3GWi-fAs9FcpOUVwpZcxV0uAH/exec' },
+    { name: 'Argyle', url: 'https://script.google.com/macros/s/AKfycbz6kwonpTnRnbpSLtFg1Y2aemFwk59pDDetLuSLTdlgd11rGDInIdr8dXzGb0CaI_Qouw/exec' }
+  ];
+  /* ============================================================================================ */
 
   // Must match SIGNUP_CATEGORIES in the toy drive app.
   const CATEGORIES = [
@@ -172,9 +191,14 @@
     set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   };
   let session = store.get('wbo_session'); // sign-in pass from the Sheet; the passcode itself is never kept
+  // Phones signed in before locations existed were signed in to Haslet.
+  let place = store.get('wbo_location') || (session ? 'Haslet' : '');
+  const locUrl = () => (LOCATIONS.find(l => l.name === place) || {}).url;
 
   async function api(body) {
-    const res = await fetch(SCRIPT_URL, {
+    const url = locUrl();
+    if (!url) throw new Error('no location');
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight Apps Script can't answer
       body: JSON.stringify(Object.assign({ session: session }, body))
@@ -182,10 +206,27 @@
     return res.json();
   }
 
-  /* ---------- Sign in / sign out ---------- */
+  /* ---------- Pick a location, sign in / sign out ---------- */
+  LOCATIONS.forEach(l => {
+    const b = document.createElement('button');
+    b.textContent = l.name;
+    b.onclick = () => { setLocation(l.name); showSetup(); };
+    $('locs').append(b);
+  });
+  function setLocation(name) {
+    place = name; store.set('wbo_location', name);
+    $('hLoc').textContent = name;
+    sheetCounts = null; today = null; total = null; // the other location's numbers don't apply
+  }
+  function showPick() {
+    $('pick').hidden = false; $('setup').hidden = true; $('app').hidden = true; $('admin').hidden = true;
+    $('today').textContent = ''; $('total').textContent = '';
+  }
   function showSetup(why) {
+    if (!locUrl()) { showPick(); return; }
+    $('setLoc').textContent = place;
     $('setPass').value = ''; $('setMsg').textContent = ''; $('setWhy').textContent = why || '';
-    $('setup').hidden = false; $('app').hidden = true; $('admin').hidden = true;
+    $('pick').hidden = true; $('setup').hidden = false; $('app').hidden = true; $('admin').hidden = true;
     $('today').textContent = ''; $('total').textContent = '';
   }
   function signOut(why) {
@@ -193,12 +234,13 @@
     $('recent').innerHTML = '';
     showSetup(why);
   }
+  $('changeLoc').onclick = () => { setLocation(''); $('hLoc').textContent = ''; showPick(); };
   // The Sheet says this phone's pass no longer works.
   function signedOut(r) {
     signOut(r.active === false ? 'Sign-ups were turned off, so this phone was signed out. A leader can turn them on with Admin login and sign it in again.'
       : 'This phone was signed out. A leader needs to sign it in again.');
   }
-  function showApp() { $('setup').hidden = true; $('admin').hidden = true; $('app').hidden = false; refresh(); }
+  function showApp() { $('pick').hidden = true; $('setup').hidden = true; $('admin').hidden = true; $('app').hidden = false; refresh(); }
 
   $('setSave').onclick = async () => {
     const p = $('setPass').value.trim();
@@ -220,7 +262,11 @@
     }
     $('setSave').disabled = false;
   };
-  $('changeSetup').onclick = () => { if (confirm('Sign out this phone?\n\nA leader will need to type the passcode to sign it in again.')) signOut(); };
+  $('changeSetup').onclick = () => {
+    if (!confirm('Sign out this phone?\n\nA leader will need to choose the location and type its passcode to sign it in again.')) return;
+    session = ''; store.set('wbo_session', ''); $('recent').innerHTML = '';
+    setLocation(''); $('hLoc').textContent = ''; showPick();
+  };
   $('setPass').onkeydown = e => { if (e.key === 'Enter') $('setSave').click(); };
 
   /* ---------- Counts: what the Sheet last said, plus taps still on their way ---------- */
@@ -394,7 +440,7 @@
   };
   $('adminBack').onclick = () => { adminCode = ''; adminData = null; if (session) showApp(); else showSetup(); };
 
-  function showAdmin(d) { $('app').hidden = true; $('setup').hidden = true; $('admin').hidden = false; window.scrollTo(0, 0); renderAdmin(d); }
+  function showAdmin(d) { $('app').hidden = true; $('pick').hidden = true; $('setup').hidden = true; $('admin').hidden = false; window.scrollTo(0, 0); renderAdmin(d); }
   async function adminRefresh() {
     try {
       const r = await api({ action: 'adminData', adminCode: adminCode });
@@ -478,7 +524,8 @@
   }
 
   /* ---------- Start ---------- */
-  if (session) showApp(); else showSetup();
+  if (place) setLocation(place);
+  if (session && locUrl()) showApp(); else if (locUrl()) showSetup(); else showPick();
 </script>
 </body>
 </html>
