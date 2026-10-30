@@ -93,12 +93,15 @@
 </header>
 
 <main>
-  <!-- One-time setup on each phone (same passcode as the toy scanner) -->
+  <!-- Sign in: a leader types the passcode. The phone keeps only a sign-in pass, which stops
+       working when sign-ups are turned off (Turn off, or automatically at midnight). -->
   <div class="card" id="setup" hidden>
-    <div class="lbl">Set up this phone</div>
-    <div><label for="setPass">Passcode</label><input id="setPass" autocomplete="off" placeholder="Ask the toy drive leader"></div>
-    <button class="btn" id="setSave">Continue</button>
-    <div id="setMsg" class="st"></div>
+    <div class="lbl">Sign in this phone</div>
+    <div id="setWhy" class="sub"></div>
+    <div><label for="setPass">Passcode</label><input id="setPass" type="password" autocomplete="off" placeholder="A leader types this in"></div>
+    <button class="btn" id="setSave">Sign in</button>
+    <div id="setMsg" style="font-size:14px;color:var(--red)"></div>
+    <button class="link" id="adminLink2">Admin login</button>
   </div>
 
   <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
@@ -107,7 +110,7 @@
     <div id="status"></div>
     <ul id="recent"></ul>
     <div class="foot">
-      <button class="link" id="changeSetup">Change passcode</button>
+      <button class="link" id="changeSetup">Sign out this phone</button>
       <button class="link" id="adminLink">Admin login</button>
     </div>
   </div>
@@ -168,37 +171,57 @@
     get(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   };
-  let pass = store.get('tds_pass');
+  let session = store.get('wbo_session'); // sign-in pass from the Sheet; the passcode itself is never kept
 
   async function api(body) {
     const res = await fetch(SCRIPT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight Apps Script can't answer
-      body: JSON.stringify(Object.assign({ passcode: pass }, body))
+      body: JSON.stringify(Object.assign({ session: session }, body))
     });
     return res.json();
   }
 
-  /* ---------- One-time setup ---------- */
-  function showSetup() { $('setPass').value = pass; $('setup').hidden = false; $('app').hidden = true; $('admin').hidden = true; }
+  /* ---------- Sign in / sign out ---------- */
+  function showSetup(why) {
+    $('setPass').value = ''; $('setMsg').textContent = ''; $('setWhy').textContent = why || '';
+    $('setup').hidden = false; $('app').hidden = true; $('admin').hidden = true;
+    $('today').textContent = ''; $('total').textContent = '';
+  }
+  function signOut(why) {
+    session = ''; store.set('wbo_session', '');
+    $('recent').innerHTML = '';
+    showSetup(why);
+  }
+  // The Sheet says this phone's pass no longer works.
+  function signedOut(r) {
+    signOut(r.active === false ? 'Sign-ups were turned off, so this phone was signed out. A leader can turn them on with Admin login and sign it in again.'
+      : 'This phone was signed out. A leader needs to sign it in again.');
+  }
   function showApp() { $('setup').hidden = true; $('admin').hidden = true; $('app').hidden = false; refresh(); }
 
   $('setSave').onclick = async () => {
     const p = $('setPass').value.trim();
     if (!p) { $('setMsg').textContent = 'Enter the passcode.'; return; }
     $('setSave').disabled = true;
-    $('setMsg').textContent = 'Checking…';
-    pass = p;
+    $('setMsg').textContent = '';
+    $('setWhy').textContent = 'Checking…';
     try {
-      const r = await api({ action: 'signups' });
-      if (r.ok) { store.set('tds_pass', p); applyState(r); showApp(); }
-      else $('setMsg').textContent = r.error === 'wrong_passcode' ? 'That passcode isn\'t right. Check with the toy drive leader.' : 'The Sheet answered with an error: ' + r.error;
+      const r = await api({ action: 'signupLogin', passcode: p });
+      $('setWhy').textContent = '';
+      $('setPass').value = '';
+      if (r.ok) { session = r.session; store.set('wbo_session', session); applyState(r); showApp(); }
+      else $('setMsg').textContent = r.error === 'wrong_passcode' ? 'That passcode isn\'t right.'
+        : r.error === 'turned_off' ? 'Sign-ups are turned off. Turn them on with Admin login below, then sign in.'
+        : r.error === 'login_locked' ? 'Too many wrong tries. Wait 15 minutes and try again.'
+        : 'The Sheet answered with an error: ' + r.error;
     } catch (e) {
       $('setMsg').textContent = 'Couldn\'t reach the Sheet. Check your internet connection and try again.';
     }
     $('setSave').disabled = false;
   };
-  $('changeSetup').onclick = () => showSetup();
+  $('changeSetup').onclick = () => { if (confirm('Sign out this phone?\n\nA leader will need to type the passcode to sign it in again.')) signOut(); };
+  $('setPass').onkeydown = e => { if (e.key === 'Enter') $('setSave').click(); };
 
   /* ---------- Counts: what the Sheet last said, plus taps still on their way ---------- */
   let sheetCounts = null, today = null, total = null, active = true;
@@ -241,7 +264,7 @@
     try {
       const r = await api({ action: 'signups' });
       if (r.ok) applyState(r);
-      else if (r.error === 'wrong_passcode') status('The passcode was changed. Tap "Change passcode".', true);
+      else if (r.error === 'signed_out') signedOut(r);
     } catch (e) { /* try again next time */ }
   }
   setInterval(() => { if (!$('app').hidden && !document.hidden) refresh(); }, 20000);
@@ -290,8 +313,7 @@
     render();
     beep(false);
     if (!r) setRecent(li, 'Not saved (no connection)', 'bad', () => send(cat, li));
-    else if (r.error === 'turned_off') { setRecent(li, 'Not saved: sign-ups are off', 'bad'); }
-    else if (r.error === 'wrong_passcode') { setRecent(li, 'Not saved', 'bad', () => send(cat, li)); status('The passcode was changed. Tap "Change passcode".', true); }
+    else if (r.error === 'signed_out') signedOut(r);
     else setRecent(li, 'Not saved', 'bad', () => send(cat, li));
   }
 
@@ -305,13 +327,14 @@
     setRecent(li, 'Undoing…');
     try {
       const r = await api({ action: 'signupUndo', category: cat, id: id });
+      if (r.error === 'signed_out') { signedOut(r); return; }
       applyState(r);
       if (r.ok) {
         li.classList.remove('undoable'); li.classList.add('done'); delete li.dataset.id;
         setRecent(li, r.removed ? 'Undone' : 'Already undone');
       } else {
         setRecent(li, 'Tap to undo', 'tap');
-        status(r.error === 'turned_off' ? 'Sign-ups are turned off, so undo is off too.' : 'Couldn\'t undo: ' + r.error, true);
+        status('Couldn\'t undo: ' + r.error, true);
       }
     } catch (e) {
       setRecent(li, 'Tap to undo', 'tap');
@@ -351,9 +374,9 @@
   const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
   const adminErr = e => e === 'wrong_admin_code' ? 'That admin passcode isn\'t right.'
     : e === 'admin_locked' ? 'Too many wrong tries. Wait 15 minutes and try again.'
-    : e === 'wrong_passcode' ? 'The phone passcode was changed. Tap "Change passcode" first.'
     : 'The Sheet answered with an error: ' + e;
 
+  $('adminLink2').onclick = () => $('adminLink').click();
   $('adminLink').onclick = () => { $('adminCode').value = ''; $('adminMsg').textContent = ''; $('adminBox').hidden = false; $('adminCode').focus(); };
   $('adminCancel').onclick = () => { $('adminBox').hidden = true; };
   $('adminCode').onkeydown = e => { if (e.key === 'Enter') $('adminGo').click(); };
@@ -369,9 +392,9 @@
     } catch (e) { $('adminMsg').textContent = 'Couldn\'t reach the Sheet. Check the internet connection.'; }
     $('adminGo').disabled = false;
   };
-  $('adminBack').onclick = () => { adminCode = ''; adminData = null; showApp(); };
+  $('adminBack').onclick = () => { adminCode = ''; adminData = null; if (session) showApp(); else showSetup(); };
 
-  function showAdmin(d) { $('app').hidden = true; $('admin').hidden = false; window.scrollTo(0, 0); renderAdmin(d); }
+  function showAdmin(d) { $('app').hidden = true; $('setup').hidden = true; $('admin').hidden = false; window.scrollTo(0, 0); renderAdmin(d); }
   async function adminRefresh() {
     try {
       const r = await api({ action: 'adminData', adminCode: adminCode });
@@ -382,7 +405,7 @@
 
   $('swBtn').onclick = async () => {
     const on = !adminData.active;
-    if (!on && !confirm('Turn sign-ups OFF?\n\nPhones will stop adding and undoing until you turn them back on.')) return;
+    if (!on && !confirm('Turn sign-ups OFF?\n\nThis signs every phone out right away. To use them again, turn sign-ups back on and type the passcode into each phone.')) return;
     $('swBtn').disabled = true;
     try {
       const r = await api({ action: 'adminSwitch', adminCode: adminCode, on: on });
@@ -455,7 +478,7 @@
   }
 
   /* ---------- Start ---------- */
-  if (pass) showApp(); else showSetup();
+  if (session) showApp(); else showSetup();
 </script>
 </body>
 </html>
