@@ -26,8 +26,6 @@
   #status { font-size:14px; color:var(--muted); text-align:center; }
   #status:empty { display:none; }
   #status.err { color:var(--red); }
-  #off { background:#fbeceb; border-color:var(--red); color:var(--red); text-align:center; font-weight:600; }
-  #off small { display:block; font-weight:400; color:var(--muted); margin-top:4px; }
   /* Girls down the left, Boys down the right. */
   #cats { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(6, auto); grid-auto-flow:column; gap:10px; }
   #cats button { min-height:76px; border:0; border-radius:12px; color:#fff; font-size:20px; font-weight:700; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; touch-action:manipulation; }
@@ -37,7 +35,6 @@
   #cats button:active { transform:scale(.97); }
   #cats button.flash { animation: flash 1.6s ease-out; }
   @keyframes flash { 0%, 55% { box-shadow: 0 0 0 6px #f2c94c; } 100% { box-shadow: 0 0 0 0 transparent; } }
-  #cats.disabled button { background:#9aa39e; cursor:not-allowed; }
   #recent { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
   #recent li { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:15px; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-variant-numeric: tabular-nums; }
   #recent li.girls { border-left:5px solid var(--girls); }
@@ -60,11 +57,6 @@
   #adminMsg { font-size:14px; color:var(--red); min-height:18px; }
   /* Admin page */
   #admin { display:flex; flex-direction:column; gap:14px; }
-  .sw { flex-direction:row; align-items:center; justify-content:space-between; gap:12px; }
-  .sw .state { font-size:20px; font-weight:700; }
-  .sw.on { border-color:var(--green); background:#e8f3ec; } .sw.on .state { color:var(--green); }
-  .sw.off { border-color:var(--red); background:#fbeceb; } .sw.off .state { color:var(--red); }
-  .sw .btn { width:auto; padding:12px 18px; }
   .tiles { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .tile { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; }
   .tile .n { font-size:28px; font-weight:700; font-variant-numeric:tabular-nums; }
@@ -99,8 +91,8 @@
 </header>
 
 <main>
-  <!-- Sign in: a leader types the passcode. The phone keeps only a sign-in pass, which stops
-       working when sign-ups are turned off (Turn off, or automatically at midnight). -->
+  <!-- Sign in: a leader types the passcode once. The phone keeps only a sign-in pass and stays
+       signed in until someone taps "Sign out this phone". -->
   <!-- Step 1: pick the location (each location has its own Sheet and passcode) -->
   <div class="card" id="pick" hidden>
     <div class="lbl">Choose your location</div>
@@ -121,7 +113,6 @@
   </div>
 
   <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
-    <div class="card" id="off" hidden>Sign-ups are turned off right now.<small>A leader can turn them back on with Admin login below.</small></div>
     <div id="cats"></div>
     <div id="status"></div>
     <ul id="recent"></ul>
@@ -131,9 +122,8 @@
     </div>
   </div>
 
-  <!-- Admin page: On/Off switch and KPIs (needs the admin passcode, works while sign-ups are off) -->
+  <!-- Admin page: KPIs (needs the admin passcode) -->
   <div id="admin" hidden>
-    <div class="card sw" id="sw"><div><div class="lbl">Sign-up app</div><div class="state" id="swState"></div></div><button class="btn" id="swBtn"></button></div>
     <div class="tiles">
       <div class="tile"><div class="n" id="kTotal">–</div><div class="l">Overall total</div><div class="s" id="kTotalS"></div></div>
       <div class="tile"><div class="n" id="kToday">–</div><div class="l">Today</div><div class="s" id="kTodayS"></div></div>
@@ -237,8 +227,7 @@
   $('changeLoc').onclick = () => { setLocation(''); $('hLoc').textContent = ''; showPick(); };
   // The Sheet says this phone's pass no longer works.
   function signedOut(r) {
-    signOut(r.active === false ? 'Sign-ups were turned off, so this phone was signed out. A leader can turn them on with Admin login and sign it in again.'
-      : 'This phone was signed out. A leader needs to sign it in again.');
+    signOut('This phone was signed out. A leader needs to sign it in again.');
   }
   function showApp() { $('pick').hidden = true; $('setup').hidden = true; $('admin').hidden = true; $('app').hidden = false; refresh(); }
 
@@ -254,7 +243,6 @@
       $('setPass').value = '';
       if (r.ok) { session = r.session; store.set('wbo_session', session); applyState(r); showApp(); }
       else $('setMsg').textContent = r.error === 'wrong_passcode' ? 'That passcode isn\'t right.'
-        : r.error === 'turned_off' ? 'Sign-ups are turned off. Turn them on with Admin login below, then sign in.'
         : r.error === 'login_locked' ? 'Too many wrong tries. Wait 15 minutes and try again.'
         : 'The Sheet answered with an error: ' + r.error;
     } catch (e) {
@@ -270,7 +258,7 @@
   $('setPass').onkeydown = e => { if (e.key === 'Enter') $('setSave').click(); };
 
   /* ---------- Counts: what the Sheet last said, plus taps still on their way ---------- */
-  let sheetCounts = null, today = null, total = null, active = true;
+  let sheetCounts = null, today = null, total = null;
   const pending = {}; // category -> taps sent but not answered yet
   const buttons = {};
   CATEGORIES.forEach(c => {
@@ -292,20 +280,16 @@
     });
     $('today').textContent = today === null ? '' : 'Today: ' + (today + waiting);
     $('total').textContent = total === null ? '' : 'Total: ' + (total + waiting);
-    $('off').hidden = active;
-    $('cats').classList.toggle('disabled', !active);
   }
   function applyState(r) {
     if (r.counts) sheetCounts = r.counts;
     if (typeof r.today === 'number') today = r.today;
     if (typeof r.total === 'number') total = r.total;
-    if (typeof r.active === 'boolean') active = r.active;
-    if (active && /turned off/.test($('status').textContent)) status('');
     render();
   }
   render();
 
-  // Keep counts (and the on/off switch) current when other phones are adding too.
+  // Keep counts current when other phones are adding too.
   async function refresh() {
     try {
       const r = await api({ action: 'signups' });
@@ -332,7 +316,6 @@
   /* ---------- Tap = +1 right away, then saved to the Sheet ---------- */
   const lastTap = {};
   function tap(cat) {
-    if (!active) { beep(false); return; } // the red banner already says why
     const now = Date.now();
     if (now - (lastTap[cat] || 0) < 700) return; // an accidental double tap counts once
     lastTap[cat] = now;
@@ -367,7 +350,6 @@
   async function undo(li) {
     const cat = li.dataset.cat, id = li.dataset.id;
     if (!id || li.classList.contains('busy')) return;
-    if (!active) { status('Sign-ups are turned off, so undo is off too.', true); return; }
     if (!confirm('Undo this sign-up?\n\n' + cat + ' at ' + li.querySelector('.when').textContent)) return;
     li.classList.add('busy');
     setRecent(li, 'Undoing…');
@@ -449,27 +431,12 @@
   }
   setInterval(() => { if (!$('admin').hidden && !document.hidden) adminRefresh(); }, 20000);
 
-  $('swBtn').onclick = async () => {
-    const on = !adminData.active;
-    if (!on && !confirm('Turn sign-ups OFF?\n\nThis signs every phone out right away. To use them again, turn sign-ups back on and type the passcode into each phone.')) return;
-    $('swBtn').disabled = true;
-    try {
-      const r = await api({ action: 'adminSwitch', adminCode: adminCode, on: on });
-      if (r.ok) renderAdmin(r); else $('adminStatus').textContent = adminErr(r.error);
-    } catch (e) { $('adminStatus').textContent = 'Couldn\'t reach the Sheet. Try again.'; }
-    $('swBtn').disabled = false;
-  };
-
   const dateOf = k => { const p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); };
   const dayLabel = k => dateOf(k).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const split = (g, b) => '<span class="dot girls"></span>' + g + ' &nbsp; <span class="dot boys"></span>' + b;
 
   function renderAdmin(d) {
     adminData = d;
-    active = d.active; render(); // keep the sign-up screen in step
-    $('sw').className = 'card sw ' + (d.active ? 'on' : 'off');
-    $('swState').textContent = d.active ? 'ON' : 'OFF';
-    $('swBtn').textContent = d.active ? 'Turn off' : 'Turn on';
     $('adminStatus').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ' · refreshes every 20 seconds';
 
     const byDay = {}, days = [];
