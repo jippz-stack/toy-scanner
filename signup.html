@@ -44,7 +44,7 @@
   #recent .st { font-size:13px; color:var(--muted); }
   #recent .st.tap { color:var(--fg); text-decoration:underline; }
   #recent .st.bad { color:var(--red); }
-  #recent li.done { opacity:.55; }
+  #recent li.mine { background:#fffbea; }
   #recent button { font-size:13px; padding:4px 10px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--fg); }
   .link { background:none; border:0; color:var(--muted); font-size:13px; text-decoration:underline; padding:0; align-self:center; }
   .foot { display:flex; justify-content:center; gap:22px; }
@@ -115,6 +115,7 @@
   <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
     <div id="cats"></div>
     <div id="status"></div>
+    <div class="lbl" id="recentHead" hidden>Latest sign-ups (all phones)</div>
     <ul id="recent"></ul>
     <div class="foot">
       <button class="link" id="changeSetup">Sign out this phone</button>
@@ -221,7 +222,7 @@
   }
   function signOut(why) {
     session = ''; store.set('wbo_session', '');
-    $('recent').innerHTML = '';
+    local.length = 0; sheetRecent = []; renderRecent();
     showSetup(why);
   }
   $('changeLoc').onclick = () => { setLocation(''); $('hLoc').textContent = ''; showPick(); };
@@ -252,7 +253,7 @@
   };
   $('changeSetup').onclick = () => {
     if (!confirm('Sign out this phone?\n\nA leader will need to choose the location and type its passcode to sign it in again.')) return;
-    session = ''; store.set('wbo_session', ''); $('recent').innerHTML = '';
+    session = ''; store.set('wbo_session', ''); local.length = 0; sheetRecent = []; renderRecent();
     setLocation(''); $('hLoc').textContent = ''; showPick();
   };
   $('setPass').onkeydown = e => { if (e.key === 'Enter') $('setSave').click(); };
@@ -285,6 +286,7 @@
     if (r.counts) sheetCounts = r.counts;
     if (typeof r.today === 'number') today = r.today;
     if (typeof r.total === 'number') total = r.total;
+    if (Array.isArray(r.recent)) { sheetRecent = r.recent; renderRecent(); }
     render();
   }
   render();
@@ -323,78 +325,84 @@
     const b = buttons[cat];
     b.classList.remove('flash'); void b.offsetWidth; b.classList.add('flash');
     status('');
-    send(cat, addRecent(cat));
+    const item = { cat, when: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) };
+    local.unshift(item);
+    send(item);
   }
 
-  async function send(cat, li) {
-    pending[cat]++; render();
-    setRecent(li, 'Saving…');
+  /* ---------- Latest sign-ups: the Sheet's last 8 from every phone, plus this phone's
+     taps that are still saving or didn't save ---------- */
+  const local = [];       // {cat, when, failed, msg}: this phone's taps not in the Sheet yet
+  let sheetRecent = [];   // [{id, c, t, day}] newest first, from the Sheet
+  const undoing = {};     // Entry IDs being undone
+
+  async function send(item) {
+    item.failed = false; renderRecent();
+    pending[item.cat]++; render();
     let r = null;
-    try { r = await api({ action: 'signup', category: cat }); } catch (e) { r = null; }
-    pending[cat]--;
-    if (r) applyState(r);
+    try { r = await api({ action: 'signup', category: item.cat }); } catch (e) { r = null; }
+    pending[item.cat]--;
     if (r && r.ok) {
-      li.dataset.id = r.id;
-      setRecent(li, 'Tap to undo', 'tap');
-      li.classList.add('undoable');
+      local.splice(local.indexOf(item), 1); // now it's in the Sheet's list
+      applyState(r);
       return;
     }
     render();
     beep(false);
-    if (!r) setRecent(li, 'Not saved (no connection)', 'bad', () => send(cat, li));
-    else if (r.error === 'signed_out') signedOut(r);
-    else setRecent(li, 'Not saved', 'bad', () => send(cat, li));
+    if (r && r.error === 'signed_out') { signedOut(r); return; }
+    item.failed = true;
+    item.msg = r ? 'Not saved' : 'Not saved (no connection)';
+    renderRecent();
   }
 
-  /* ---------- Tap a recent sign-up to undo it ---------- */
-  async function undo(li) {
-    const cat = li.dataset.cat, id = li.dataset.id;
-    if (!id || li.classList.contains('busy')) return;
-    if (!confirm('Undo this sign-up?\n\n' + cat + ' at ' + li.querySelector('.when').textContent)) return;
-    li.classList.add('busy');
-    setRecent(li, 'Undoing…');
+  async function undo(x) {
+    if (!x.id || undoing[x.id]) return;
+    if (!confirm('Undo this sign-up?\n\n' + x.c + ' at ' + (x.day ? x.day + ' ' : '') + x.t)) return;
+    undoing[x.id] = true; renderRecent();
     try {
-      const r = await api({ action: 'signupUndo', category: cat, id: id });
+      const r = await api({ action: 'signupUndo', category: x.c, id: x.id });
+      delete undoing[x.id];
       if (r.error === 'signed_out') { signedOut(r); return; }
       applyState(r);
-      if (r.ok) {
-        li.classList.remove('undoable'); li.classList.add('done'); delete li.dataset.id;
-        setRecent(li, r.removed ? 'Undone' : 'Already undone');
-      } else {
-        setRecent(li, 'Tap to undo', 'tap');
-        status('Couldn\'t undo: ' + r.error, true);
-      }
+      if (!r.ok) status('Couldn\'t undo: ' + r.error, true);
+      else if (!r.removed) status('That sign-up was already undone.');
+      else status('');
     } catch (e) {
-      setRecent(li, 'Tap to undo', 'tap');
+      delete undoing[x.id];
+      renderRecent();
       status('Couldn\'t undo: no connection. Try again.', true);
     }
-    li.classList.remove('busy');
   }
 
-  /* ---------- Recent sign-ups list (last 10 on this phone) ---------- */
-  function addRecent(cat) {
-    const li = document.createElement('li');
-    li.className = side(cat);
-    li.dataset.cat = cat;
-    li.innerHTML = '<span><span class="code"></span><span class="when"></span></span><span class="right"></span>';
-    li.querySelector('.code').textContent = cat;
-    li.querySelector('.when').textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    li.onclick = e => { if (e.target.tagName !== 'BUTTON') undo(li); };
-    $('recent').prepend(li);
-    while ($('recent').children.length > 10) $('recent').lastChild.remove();
-    return li;
-  }
-  function setRecent(li, text, cls, retry) {
-    const right = li.querySelector('.right');
-    right.innerHTML = '<span class="st"></span>';
-    const st = right.querySelector('.st');
-    st.textContent = text; if (cls) st.classList.add(cls);
-    if (retry) {
+  function renderRecent() {
+    const ul = $('recent');
+    ul.innerHTML = '';
+    const row = (cat, when, cls) => {
+      const li = document.createElement('li');
+      li.className = side(cat) + (cls ? ' ' + cls : '');
+      li.innerHTML = '<span><span class="code"></span><span class="when"></span></span><span class="right"><span class="st"></span></span>';
+      li.querySelector('.code').textContent = cat;
+      li.querySelector('.when').textContent = when;
+      ul.append(li);
+      return li;
+    };
+    local.forEach(item => {
+      const li = row(item.cat, item.when, 'mine');
+      const st = li.querySelector('.st');
+      if (!item.failed) { st.textContent = 'Saving…'; return; }
+      st.textContent = item.msg; st.classList.add('bad');
       const b = document.createElement('button');
       b.textContent = 'Retry';
-      b.onclick = retry;
-      right.append(' ', b);
-    }
+      b.onclick = () => send(item);
+      li.querySelector('.right').append(' ', b);
+    });
+    sheetRecent.forEach(x => {
+      const li = row(x.c, (x.day ? x.day + ' ' : '') + x.t);
+      const st = li.querySelector('.st');
+      if (undoing[x.id]) st.textContent = 'Undoing…';
+      else if (x.id) { st.textContent = 'Tap to undo'; st.classList.add('tap'); li.classList.add('undoable'); li.onclick = () => undo(x); }
+    });
+    $('recentHead').hidden = !ul.children.length;
   }
 
   /* ---------- Admin login: the Sheet checks the code (App Settings → Admin passcode) ---------- */
