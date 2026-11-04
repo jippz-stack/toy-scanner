@@ -3,24 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Toy Drive Scanner</title>
+<title>Toy Scanner</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
 <style>
-  :root { --bg:#f6f7f4; --card:#fff; --fg:#1d2420; --muted:#5f6b64; --red:#b3261e; --green:#1f6b45; --line:#d9ded8; --warn:#8a5a00; }
+  :root { --bg:#f6f7f4; --card:#fff; --fg:#1d2420; --muted:#5f6b64; --red:#b3261e; --green:#1f6b45; --line:#d9ded8; --warn:#8a5a00; --warn-soft:#fbf0d9; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:var(--bg); color:var(--fg); -webkit-tap-highlight-color: transparent; }
   header { background:var(--green); color:#fff; padding:14px max(16px, env(safe-area-inset-right)) 14px max(16px, env(safe-area-inset-left)); padding-top: max(14px, env(safe-area-inset-top)); display:flex; justify-content:space-between; align-items:center; gap:12px; }
   header h1 { font-size:18px; margin:0; }
+  header .loc { font-size:13px; opacity:.85; margin-top:2px; }
   .hright { text-align:right; line-height:1.25; font-size:13px; }
-  #ver { font-size:12px; opacity:.8; }
   main { padding:16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); display:flex; flex-direction:column; gap:14px; max-width:520px; margin:0 auto; }
-  .mode { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
-  .mode button { border:0; padding:12px; font-size:15px; background:var(--card); color:var(--fg); }
+  .mode { display:grid; grid-template-columns:1fr 1fr 1fr; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .mode button { border:0; padding:12px 4px; font-size:15px; background:var(--card); color:var(--fg); }
   .mode button.on { background:var(--fg); color:#fff; }
   #reader { width:100%; border-radius:10px; overflow:hidden; background:#000; }
   #reader video { border-radius:10px; }
-  .btn { display:block; width:100%; padding:14px; font-size:16px; border-radius:10px; border:0; background:var(--red); color:#fff; font-weight:600; text-align:center; cursor:pointer; }
+  .btn { display:block; width:100%; padding:14px; font-size:16px; border-radius:10px; border:0; background:var(--red); color:#fff; font-weight:600; text-align:center; cursor:pointer; text-decoration:none; }
   .btn.alt { background:var(--card); color:var(--fg); border:1px solid var(--line); font-weight:500; }
   .btn:disabled { opacity:.6; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:10px; }
@@ -28,9 +28,11 @@
   input { width:100%; padding:10px; font-size:16px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
   .choices { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
   .choices button { padding:12px 4px; font-size:15px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
-  .choices.five { grid-template-columns:repeat(5,1fr); gap:6px; }
-  .choices.five button { padding:12px 2px; font-size:14px; }
   .choices button.on { background:var(--green); color:#fff; border-color:var(--green); }
+  .choices .hint { display:block; font-size:11px; opacity:.75; margin-top:2px; }
+  .price { display:flex; align-items:center; gap:6px; }
+  .price span { font-size:18px; color:var(--muted); }
+  .price input { flex:1; }
   .row { display:flex; gap:8px; }
   .row input { flex:1; min-width:0; }
   .row .btn { width:auto; padding:10px 16px; }
@@ -46,139 +48,195 @@
   .flash { animation: flash .5s; }
   @keyframes flash { from { box-shadow: 0 0 0 4px var(--green); } to { box-shadow: 0 0 0 0 transparent; } }
   .link { background:none; border:0; color:var(--muted); font-size:13px; text-decoration:underline; padding:0; align-self:center; }
+  /* Inventory view */
+  .tiles { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  .tile .n { font-size:28px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .tile .l { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .tile.warn .n { color:var(--warn); }
+  .card h3 { margin:0; font-size:15px; }
+  .card .sub { margin:0; font-size:12px; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  th { text-align:left; font-size:12px; color:var(--muted); font-weight:600; padding:6px; border-bottom:1px solid var(--line); }
+  td { padding:7px 6px; border-bottom:1px solid var(--line); font-size:15px; }
+  td.num, th.num { text-align:right; }
+  td.zero { color:#b7beb9; }
+  tr.total td { font-weight:700; border-bottom:0; }
+  .bar { display:grid; grid-template-columns:78px 1fr 34px; align-items:center; gap:8px; font-size:14px; margin:6px 0; }
+  .bar .track { height:12px; background:#e3efe7; border-radius:6px; overflow:hidden; }
+  .bar .fill { height:100%; background:var(--green); }
+  .bar .n { text-align:right; font-weight:600; }
+  #needList { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+  #needList li { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--line); border-left:5px solid var(--warn); border-radius:8px; background:var(--card); cursor:pointer; font-size:14px; }
+  #needList .what { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #needList .miss { font-size:12px; color:var(--warn); white-space:nowrap; }
   [hidden] { display:none !important; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Toy Drive Scanner</h1>
-  <div class="hright"><div id="ver"></div><div id="count"></div></div>
+  <div><h1>Toy Scanner</h1><div class="loc" id="hLoc"></div></div>
+  <div class="hright"><div id="count"></div></div>
 </header>
 
 <main>
-  <!-- One-time setup on each phone -->
-  <div class="card" id="setup" hidden>
-    <div class="lbl">Set up this phone</div>
-    <div><label for="setName">Your name</label><input id="setName" autocomplete="name" placeholder="e.g. Maria"></div>
-    <div><label for="setPass">Passcode</label><input id="setPass" autocomplete="off" placeholder="Ask the toy drive leader"></div>
-    <button class="btn" id="setSave">Continue</button>
-    <div id="setMsg" class="st"></div>
+  <!-- Opened without the admin login: send them to the sign-up page -->
+  <div class="card" id="gate" hidden>
+    <div class="lbl">Toy scanner</div>
+    <div id="gateMsg">Open the toy scanner from the sign-up page: tap <b>Admin login</b>, then <b>Toy scanner</b>.</div>
+    <a class="btn" href="signup.html">Go to the sign-up page</a>
   </div>
 
   <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
     <div class="mode">
       <button id="mQuick" class="on">Quick add</button>
       <button id="mBatch">Batch scan</button>
+      <button id="mInv">Inventory</button>
     </div>
 
-    <div id="reader"></div>
-    <button class="btn" id="startBtn">Start scanning</button>
-    <button class="btn alt" id="stopBtn" hidden>Stop camera</button>
-    <div id="status">Tap Start scanning and point the camera at a barcode.</div>
+    <div id="scanPane" style="display:flex;flex-direction:column;gap:14px">
+      <div id="reader"></div>
+      <button class="btn" id="startBtn">Start scanning</button>
+      <button class="btn alt" id="stopBtn" hidden>Stop camera</button>
+      <div id="status">Tap Start scanning and point the camera at a barcode.</div>
+    </div>
 
     <div class="card" id="form" hidden>
-      <div><div class="lbl">Barcode</div><div id="fCode" style="font-size:18px;font-variant-numeric:tabular-nums"></div></div>
+      <div><div class="lbl" id="fTitle">Barcode</div><div id="fCode" style="font-size:18px;font-variant-numeric:tabular-nums"></div></div>
       <div><label for="fName">Item name</label><input id="fName" placeholder="Optional"></div>
+      <div><label for="fPrice">Price</label><div class="price"><span>$</span><input id="fPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="From the lookup or the tag"></div></div>
       <a class="amz" id="fAmz" target="_blank" rel="noopener">Check price on Amazon ↗</a>
       <div><div class="lbl">For</div>
         <div class="choices" data-field="forWho"><button>Boy</button><button>Girl</button><button>Either</button></div></div>
       <div><div class="lbl">Age</div>
-        <div class="choices five" data-field="age"><button>0-2</button><button>3-5</button><button>6-8</button><button>9-12</button><button>Teen</button></div></div>
+        <div class="choices" data-field="age"><button>0-2</button><button>3-5</button><button>6-8</button><button>9-11</button><button>12-14</button><button>15-18</button></div></div>
       <div><div class="lbl">Gift size</div>
-        <div class="choices" data-field="size"><button>Small</button><button>Medium</button><button>Large</button></div></div>
+        <div class="choices" data-field="size">
+          <button data-v="Stocking">Stocking<span class="hint">under $5</span></button>
+          <button data-v="Small">Small<span class="hint">$5–14.99</span></button>
+          <button data-v="Medium">Medium<span class="hint">$15–24.99</span></button>
+          <button data-v="Large">Large<span class="hint">$25+</span></button>
+          <button data-v="Gift Card">Gift Card<span class="hint">teens 15-18</span></button>
+        </div></div>
       <button class="btn" id="saveBtn">Save toy</button>
       <button class="btn alt" id="skipBtn">Cancel</button>
     </div>
 
-    <ul id="recent"></ul>
-
-    <div class="row">
-      <input id="manual" inputmode="numeric" placeholder="Type a barcode">
-      <button class="btn alt" id="manualBtn">Add</button>
+    <div id="scanExtras" style="display:flex;flex-direction:column;gap:14px">
+      <ul id="recent"></ul>
+      <div class="row">
+        <input id="manual" inputmode="numeric" placeholder="Type a barcode">
+        <button class="btn alt" id="manualBtn">Add</button>
+      </div>
+      <label class="btn alt" for="photo" style="text-transform:none;letter-spacing:0;font-size:16px;color:var(--fg)">📷 Use a photo instead</label>
+      <input type="file" id="photo" accept="image/*" capture="environment" hidden>
+      <img id="preview" hidden alt="Photo the reader saw" style="width:100%;border-radius:10px;border:1px solid var(--line)">
     </div>
-    <label class="btn alt" for="photo" style="text-transform:none;letter-spacing:0;font-size:16px;color:var(--fg)">📷 Use a photo instead</label>
-    <input type="file" id="photo" accept="image/*" capture="environment" hidden>
-    <img id="preview" hidden alt="Photo the reader saw" style="width:100%;border-radius:10px;border:1px solid var(--line)">
 
-    <button class="link" id="changeSetup">Change name or passcode</button>
+    <!-- Inventory: totals, what's on hand, and toys that still need details -->
+    <div id="invPane" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="tiles">
+        <div class="tile"><div class="n" id="iToys">–</div><div class="l">Toys collected</div></div>
+        <div class="tile"><div class="n" id="iAvail">–</div><div class="l">Available to give</div></div>
+        <div class="tile"><div class="n" id="iGiven">–</div><div class="l">Given out</div></div>
+        <div class="tile warn"><div class="n" id="iNeed">–</div><div class="l">Need details</div></div>
+      </div>
+      <div class="card">
+        <div><h3>Needs info</h3><p class="sub">Tap a toy to add who it's for, the age and the size.</p></div>
+        <ul id="needList"></ul>
+      </div>
+      <div class="card">
+        <div><h3>Available by age</h3><p class="sub">Toys still on hand with their details filled in.</p></div>
+        <div id="iAges"></div>
+      </div>
+      <div class="card">
+        <div><h3>Available by gift size</h3></div>
+        <div id="iSizes"></div>
+      </div>
+      <div id="invStatus" style="font-size:13px;color:var(--muted);text-align:center"></div>
+    </div>
+
+    <a class="link" href="signup.html">← Back to the sign-up page</a>
   </div>
 </main>
 
 <script>
-  /* ====== SETUP: paste your Apps Script web app URL here ====== */
-  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyRL1KZmp1m3G1k4KW46NkgeCnMRR6iosK-SmNu0Dv3GWi-fAs9FcpOUVwpZcxV0uAH/exec';
-  /* ============================================================ */
+  /* ====== Each location's Sheet (same list as signup.html; links from locations.json in the toy drive app) ====== */
+  const LOCATIONS = [
+    { name: 'Haslet', url: 'https://script.google.com/macros/s/AKfycbyRL1KZmp1m3G1k4KW46NkgeCnMRR6iosK-SmNu0Dv3GWi-fAs9FcpOUVwpZcxV0uAH/exec' },
+    { name: 'Argyle', url: 'https://script.google.com/macros/s/AKfycbz6kwonpTnRnbpSLtFg1Y2aemFwk59pDDetLuSLTdlgd11rGDInIdr8dXzGb0CaI_Qouw/exec' }
+  ];
+  /* ================================================================================================================ */
 
-  const APP_VERSION = 'live v4';
+  const APP_VERSION = 'toys v5';
+  const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
+  const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card'];
   const $ = id => document.getElementById(id);
   const status = (t, err) => { $('status').textContent = t; $('status').classList.toggle('err', !!err); };
-  $('ver').textContent = APP_VERSION;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-  const store = {
-    get(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
-    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-  };
-  let settings = { name: store.get('tds_name'), pass: store.get('tds_pass') };
+  // The old setup kept a name and passcode on the phone; they're no longer used.
+  try { localStorage.removeItem('tds_name'); localStorage.removeItem('tds_pass'); } catch (e) {}
+
+  // Location and admin passcode handed over by the sign-up page's Admin login (this browser tab only).
+  let access = null;
+  try { access = JSON.parse(sessionStorage.getItem('wbo_toy') || 'null'); } catch (e) {}
+  const loc = access && LOCATIONS.find(l => l.name === access.loc);
 
   async function api(body) {
-    const res = await fetch(SCRIPT_URL, {
+    const res = await fetch(loc.url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight Apps Script can't answer
-      body: JSON.stringify(Object.assign({ passcode: settings.pass }, body))
+      body: JSON.stringify(Object.assign({ adminCode: access.code }, body))
     });
     return res.json();
   }
-
-  /* ---------- One-time setup ---------- */
-  function showSetup() {
-    $('setName').value = settings.name;
-    $('setPass').value = settings.pass;
-    $('setup').hidden = false;
-    $('app').hidden = true;
+  function lockOut(err) {
+    try { sessionStorage.removeItem('wbo_toy'); } catch (e) {}
+    stopCamera();
+    $('gateMsg').innerHTML = (err === 'admin_locked' ? 'Too many wrong admin passcodes. Wait 15 minutes, then ' : 'The admin passcode was changed. ') +
+      'Open the toy scanner again from the sign-up page: <b>Admin login</b>, then <b>Toy scanner</b>.';
+    $('app').hidden = true; $('gate').hidden = false;
   }
-  function showApp() { $('setup').hidden = true; $('app').hidden = false; }
+  const isAccessError = r => r && (r.error === 'wrong_admin_code' || r.error === 'admin_locked');
 
-  $('setSave').onclick = async () => {
-    const name = $('setName').value.trim(), pass = $('setPass').value.trim();
-    if (!name || !pass) { $('setMsg').textContent = 'Enter your name and the passcode.'; return; }
-    if (SCRIPT_URL.indexOf('https://') !== 0) { $('setMsg').textContent = 'This page isn\'t connected to the Sheet yet. The web app URL needs to be added to the page.'; return; }
-    $('setSave').disabled = true;
-    $('setMsg').textContent = 'Checking…';
-    settings = { name, pass };
-    try {
-      const r = await api({ action: 'check' });
-      if (r.ok) {
-        store.set('tds_name', name); store.set('tds_pass', pass);
-        showCount(r.total); showApp();
-      } else {
-        $('setMsg').textContent = r.error === 'wrong_passcode' ? 'That passcode isn\'t right. Check with the toy drive leader.' : 'The Sheet answered with an error: ' + r.error;
-      }
-    } catch (e) {
-      $('setMsg').textContent = 'Couldn\'t reach the Sheet. Check your internet connection and try again.';
-    }
-    $('setSave').disabled = false;
-  };
-  $('changeSetup').onclick = () => { stopCamera(); showSetup(); };
+  /* ---------- Gift size from a price ---------- */
+  function sizeForPrice(p) {
+    if (p === '' || p == null || isNaN(p)) return '';
+    return p < 5 ? 'Stocking' : p < 15 ? 'Small' : p < 25 ? 'Medium' : 'Large';
+  }
 
   /* ---------- Modes ---------- */
   let mode = 'quick', current = null, formOpen = false;
   $('mQuick').onclick = () => setMode('quick');
   $('mBatch').onclick = () => setMode('batch');
+  $('mInv').onclick = () => setMode('inv');
   function setMode(m) {
     mode = m;
     $('mQuick').classList.toggle('on', m === 'quick');
     $('mBatch').classList.toggle('on', m === 'batch');
+    $('mInv').classList.toggle('on', m === 'inv');
     if (formOpen) closeForm();
-    status(m === 'batch' ? 'Batch scan: each barcode saves with a beep. Finish details on the PC later.' : 'Quick add: scan a toy, then pick who it\'s for, the age and the size.');
+    const inv = m === 'inv';
+    $('invPane').hidden = !inv; $('scanPane').hidden = inv; $('scanExtras').hidden = inv;
+    if (inv) { stopCamera(); loadInventory(); return; }
+    status(m === 'batch' ? 'Batch scan: each barcode saves with a beep. Finish the details later in Inventory.' : 'Quick add: scan a toy, then pick who it\'s for, the age and the size.');
   }
 
+  /* ---------- Form choices ---------- */
+  const valueOf = b => b.dataset.v || b.textContent;
+  function setChoice(field, v) {
+    const group = document.querySelector('.choices[data-field="' + field + '"]');
+    group.querySelectorAll('button').forEach(x => x.classList.toggle('on', valueOf(x) === v));
+    if (current) current[field] = v || '';
+  }
   document.querySelectorAll('.choices').forEach(group => {
     group.querySelectorAll('button').forEach(b => b.onclick = () => {
-      group.querySelectorAll('button').forEach(x => x.classList.remove('on'));
-      b.classList.add('on');
-      if (current) current[group.dataset.field] = b.textContent;
+      setChoice(group.dataset.field, valueOf(b));
+      if (group.dataset.field === 'size' && valueOf(b) === 'Gift Card') setChoice('age', '15-18'); // gift cards are for teens
     });
   });
+  $('fPrice').oninput = () => { const sz = sizeForPrice(parseFloat($('fPrice').value)); if (sz) setChoice('size', sz); };
 
   /* ---------- Beep (needs a tap first on iPhone) ---------- */
   let audio = null;
@@ -233,7 +291,7 @@
     lastCode = code; lastAt = now;
     beep(true);
     if (mode === 'batch') { saveBatch(code); return; }
-    openForm(code);
+    openForm({ barcode: code });
   }
 
   function saveBatch(code) {
@@ -245,9 +303,14 @@
   async function send(item, li) {
     setRecent(li, 'Saving…', '');
     try {
-      const r = await api({ action: 'save', item, scannedBy: settings.name });
-      if (r.ok) { setRecent(li, r.merged ? 'Added · now ' + r.qty : 'Saved', 'ok'); showCount(r.total); return true; }
-      if (r.error === 'wrong_passcode') { setRecent(li, 'Wrong passcode', 'bad', item); status('The passcode was changed. Tap "Change name or passcode".', true); return false; }
+      const r = await api(item.row ? { action: 'updateToy', toy: item } : { action: 'save', item });
+      if (isAccessError(r)) { lockOut(r.error); return false; }
+      if (r.ok) {
+        setRecent(li, item.row ? 'Details saved' : r.merged ? 'Added · now ' + r.qty : 'Saved', 'ok');
+        showCount(r.total);
+        if (item.row) invData = r;
+        return true;
+      }
       setRecent(li, 'Not saved', 'bad', item);
     } catch (e) {
       setRecent(li, 'No connection', 'bad', item);
@@ -279,46 +342,118 @@
     }
   }
 
-  /* ---------- Quick add form ---------- */
-  function openForm(code) {
+  /* ---------- Toy form: a new scan (Quick add) or a toy from Needs info ---------- */
+  function openForm(toy) {
     formOpen = true;
     if (scanner && scanner.isScanning) { try { scanner.pause(true); } catch (e) {} }
-    current = { barcode: code };
-    $('fCode').textContent = code;
-    $('fName').value = '';
-    $('fAmz').href = 'https://www.amazon.com/s?k=' + encodeURIComponent(code);
-    document.querySelectorAll('.choices button').forEach(x => x.classList.remove('on'));
+    current = { barcode: toy.barcode };
+    if (toy.row) current.row = toy.row;
+    $('fTitle').textContent = toy.row ? 'Finish details' : 'Barcode';
+    $('fCode').textContent = toy.barcode;
+    $('fName').value = toy.name || '';
+    $('fPrice').value = toy.price === '' || toy.price == null ? '' : toy.price;
+    $('fAmz').href = 'https://www.amazon.com/s?k=' + encodeURIComponent(toy.name || toy.barcode);
+    setChoice('forWho', toy.forWho || ''); setChoice('age', toy.age || ''); setChoice('size', toy.size || '');
+    $('saveBtn').textContent = toy.row ? 'Save details' : 'Save toy';
     $('form').hidden = false;
+    if (toy.row) { $('invPane').hidden = true; }
     $('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    status('Looking up ' + code + '…');
-    api({ action: 'lookup', barcode: code }).then(r => {
-      if (!current || current.barcode !== code) return;
-      if (r.found) { if (!$('fName').value) $('fName').value = r.name; current.brand = r.brand; status('Found it. Pick who it\'s for, the age and the size.'); }
-      else status('No name found. Type one if you like, then pick who it\'s for, the age and the size.');
+    if (toy.row) return;
+    status('Looking up ' + toy.barcode + '…');
+    api({ action: 'lookup', barcode: toy.barcode }).then(r => {
+      if (isAccessError(r)) { lockOut(r.error); return; }
+      if (!current || current.barcode !== toy.barcode) return;
+      if (!r.found) { status('No name found. Type one if you like, then pick who it\'s for, the age and the size.'); return; }
+      if (!$('fName').value) $('fName').value = r.name;
+      current.brand = r.brand;
+      if (r.price !== '' && r.price != null && !$('fPrice').value) { $('fPrice').value = r.price; $('fPrice').oninput(); }
+      if (/gift\s*card/i.test(r.name)) { setChoice('size', 'Gift Card'); setChoice('age', '15-18'); }
+      status('Found it' + (r.price ? ' ($' + r.price + ', size picked from the price)' : '') + '. Pick who it\'s for and the age.');
     }).catch(() => status('Pick who it\'s for, the age and the size.'));
   }
   function closeForm() {
+    const wasEdit = current && current.row;
     formOpen = false; current = null;
     $('form').hidden = true; $('saveBtn').disabled = false;
+    if (wasEdit && mode === 'inv') { $('invPane').hidden = false; renderInventory(); }
     if (scanner) { try { scanner.resume(); } catch (e) {} }
   }
   $('saveBtn').onclick = async () => {
     if (!current) return;
     current.name = $('fName').value.trim();
+    const p = parseFloat($('fPrice').value);
+    current.price = isNaN(p) ? '' : p;
     const item = current;
     $('saveBtn').disabled = true;
     const li = addRecent(item.barcode + (item.name ? ' · ' + item.name : ''), 'Saving…');
     closeForm();
     lastCode = item.barcode; lastAt = Date.now(); // don't re-read the same toy right away
     const ok = await send(item, li);
-    status(ok ? 'Saved. Scan the next toy.' : 'That one didn\'t save. Tap Retry next to it.', !ok);
+    if (mode === 'inv') { renderInventory(); $('invStatus').textContent = ok ? 'Saved.' : 'That one didn\'t save. Try again.'; }
+    else status(ok ? 'Saved. Scan the next toy.' : 'That one didn\'t save. Tap Retry next to it.', !ok);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  $('skipBtn').onclick = () => { closeForm(); status('Cancelled. Scan the next toy.'); };
+  $('skipBtn').onclick = () => { closeForm(); if (mode !== 'inv') status('Cancelled. Scan the next toy.'); };
 
   $('manualBtn').onclick = () => { const v = $('manual').value.trim(); if (v) { $('manual').value = ''; lastCode = ''; onScan(v); } };
 
-  /* ---------- Photo fallback (same reader as the in-Sheet page) ---------- */
+  /* ---------- Inventory ---------- */
+  let invData = null;
+  async function loadInventory() {
+    $('invStatus').textContent = 'Loading…';
+    try {
+      const r = await api({ action: 'toys' });
+      if (isAccessError(r)) { lockOut(r.error); return; }
+      if (!r.ok) { $('invStatus').textContent = 'The Sheet answered with an error: ' + r.error; return; }
+      invData = r;
+      renderInventory();
+      $('invStatus').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    } catch (e) { $('invStatus').textContent = 'Couldn\'t reach the Sheet. Check the internet connection.'; }
+  }
+  function renderInventory() {
+    if (!invData) return;
+    const rows = invData.rows;
+    const sum = (arr, f) => arr.reduce((s, r) => s + f(r), 0);
+    const avail = r => Math.max(r.qty - r.given, 0);
+    const need = rows.filter(r => r.status === 'Needs info');
+    const ready = rows.filter(r => r.status !== 'Needs info');
+    $('iToys').textContent = sum(rows, r => r.qty);
+    $('iGiven').textContent = sum(rows, r => r.given);
+    $('iAvail').textContent = sum(ready, avail);
+    $('iNeed').textContent = sum(need, r => r.qty);
+    showCount(sum(rows, r => r.qty));
+
+    const ul = $('needList'); ul.innerHTML = '';
+    if (!need.length) ul.innerHTML = '<li style="cursor:default;border-left-color:var(--green)">Every toy has its details filled in.</li>';
+    need.forEach(r => {
+      const li = document.createElement('li');
+      const missing = [!r.forWho && 'for', !r.age && 'age', !r.size && 'size'].filter(Boolean).join(', ');
+      li.innerHTML = '<span class="what"></span><span class="miss"></span>';
+      li.querySelector('.what').textContent = (r.name || r.barcode) + (r.qty > 1 ? ' ×' + r.qty : '');
+      li.querySelector('.miss').textContent = 'needs ' + missing;
+      li.onclick = () => openForm(r);
+      ul.append(li);
+    });
+
+    const fors = invData.options.forWho;
+    let h = '<table><tr><th>Age</th>' + fors.map(f => '<th class="num">' + esc(f) + '</th>').join('') + '<th class="num">Total</th></tr>';
+    const cell = n => '<td class="num' + (n ? '' : ' zero') + '">' + n + '</td>';
+    AGES.forEach(a => {
+      const cells = fors.map(f => sum(ready.filter(r => r.age === a && r.forWho === f), avail));
+      h += '<tr><td>' + a + '</td>' + cells.map(cell).join('') + cell(cells.reduce((s, n) => s + n, 0)) + '</tr>';
+    });
+    const tots = fors.map(f => sum(ready.filter(r => r.forWho === f), avail));
+    h += '<tr class="total"><td>All ages</td>' + tots.map(cell).join('') + cell(tots.reduce((s, n) => s + n, 0)) + '</tr></table>';
+    $('iAges').innerHTML = h;
+
+    const bySize = SIZES.map(s => [s, sum(ready.filter(r => r.size === s), avail)]);
+    const max = Math.max(1, ...bySize.map(x => x[1]));
+    $('iSizes').innerHTML = bySize.map(([s, n]) =>
+      '<div class="bar"><span>' + s + '</span><div class="track"><div class="fill" style="width:' + (n / max * 100) + '%"></div></div><span class="n">' + n + '</span></div>').join('');
+  }
+  setInterval(() => { if (mode === 'inv' && !formOpen && !$('app').hidden && !document.hidden) loadInventory(); }, 30000);
+
+  /* ---------- Photo fallback ---------- */
   const zxReader = new ZXing.MultiFormatReader();
   (function () {
     const hints = new Map();
@@ -379,10 +514,16 @@
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
   }
 
-  function showCount(n) { if (typeof n === 'number') $('count').textContent = n + ' toys'; }
+  function showCount(n) { if (typeof n === 'number') $('count').textContent = n + ' toys · ' + APP_VERSION; }
 
   /* ---------- Start ---------- */
-  if (settings.name && settings.pass) showApp(); else showSetup();
+  if (!loc || !access.code) {
+    $('gate').hidden = false;
+  } else {
+    $('hLoc').textContent = loc.name;
+    $('app').hidden = false;
+    api({ action: 'check' }).then(r => { if (isAccessError(r)) lockOut(r.error); else showCount(r.total); }).catch(() => {});
+  }
 </script>
 </body>
 </html>
