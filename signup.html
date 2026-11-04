@@ -125,6 +125,7 @@
 
   <!-- Admin page: KPIs (needs the admin passcode) -->
   <div id="admin" hidden>
+    <button class="btn" id="toyBtn" style="background:var(--green);font-size:18px;padding:16px">🧸 Toy scanner</button>
     <div class="tiles">
       <div class="tile"><div class="n" id="kTotal">–</div><div class="l">Overall total</div><div class="s" id="kTotalS"></div></div>
       <div class="tile"><div class="n" id="kToday">–</div><div class="l">Today</div><div class="s" id="kTodayS"></div></div>
@@ -427,6 +428,11 @@
       else $('adminMsg').textContent = adminErr(r.error);
     } catch (e) { $('adminMsg').textContent = 'Couldn\'t reach the Sheet. Check the internet connection.'; }
     $('adminGo').disabled = false;
+  };
+  // The toy scanner (index.html) uses the same location and admin passcode, kept only for this browser tab.
+  $('toyBtn').onclick = () => {
+    try { sessionStorage.setItem('wbo_toy', JSON.stringify({ loc: place, code: adminCode })); } catch (e) {}
+    window.location.href = 'index.html';
   };
   $('adminBack').onclick = () => { adminCode = ''; adminData = null; if (session) showApp(); else showSetup(); };
 
