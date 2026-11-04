@@ -70,6 +70,21 @@
   #needList li { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--line); border-left:5px solid var(--warn); border-radius:8px; background:var(--card); cursor:pointer; font-size:14px; }
   #needList .what { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #needList .miss { font-size:12px; color:var(--warn); white-space:nowrap; }
+  #recent li.gone .code { text-decoration:line-through; color:var(--muted); }
+  #recent .rm { color:var(--red); border-color:#e8c4c1; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chips button { padding:8px 10px; font-size:14px; border:1px solid var(--line); border-radius:16px; background:var(--card); color:var(--fg); }
+  .chips button.on { background:var(--green); color:#fff; border-color:var(--green); }
+  .tile.open { cursor:pointer; border-color:var(--green); }
+  .tile.open .l::after { content:' ›'; }
+  #allList { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+  #allList li { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--card); font-size:14px; }
+  #allList .what { min-width:0; }
+  #allList .nm { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #allList .dt { font-size:12px; color:var(--muted); }
+  #allList .acts { display:flex; gap:6px; flex-shrink:0; }
+  #allList button { font-size:13px; padding:6px 10px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--fg); }
+  #allList button.rm { color:var(--red); border-color:#e8c4c1; }
   [hidden] { display:none !important; }
 </style>
 </head>
@@ -83,7 +98,7 @@
   <!-- Opened without the admin login: send them to the sign-up page -->
   <div class="card" id="gate" hidden>
     <div class="lbl">Toy scanner</div>
-    <div id="gateMsg">Open the toy scanner from the sign-up page: tap <b>Admin login</b>, then <b>Toy scanner</b>.</div>
+    <div id="gateMsg">Open the toy scanner from the sign-up page: choose your location, then use <b>Toy Inventory</b>.</div>
     <a class="btn" href="signup.html">Go to the sign-up page</a>
   </div>
 
@@ -105,6 +120,7 @@
       <div><div class="lbl" id="fTitle">Barcode</div><div id="fCode" style="font-size:18px;font-variant-numeric:tabular-nums"></div></div>
       <div><label for="fName">Item name</label><input id="fName" placeholder="Optional"></div>
       <div><label for="fPrice">Price</label><div class="price"><span>$</span><input id="fPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="From the lookup or the tag"></div></div>
+      <div id="fPricesBox" hidden><div class="lbl" style="margin-bottom:6px">Store prices found (tap the one that matches)</div><div class="chips" id="fPrices"></div></div>
       <a class="amz" id="fAmz" target="_blank" rel="noopener">Check price on Amazon ↗</a>
       <div><div class="lbl">For</div>
         <div class="choices" data-field="forWho"><button>Boy</button><button>Girl</button><button>Either</button></div></div>
@@ -136,7 +152,7 @@
     <!-- Inventory: totals, what's on hand, and toys that still need details -->
     <div id="invPane" hidden style="display:flex;flex-direction:column;gap:14px">
       <div class="tiles">
-        <div class="tile"><div class="n" id="iToys">–</div><div class="l">Toys collected</div></div>
+        <div class="tile open" id="iToysTile" role="button" tabindex="0"><div class="n" id="iToys">–</div><div class="l">Toys collected</div></div>
         <div class="tile"><div class="n" id="iAvail">–</div><div class="l">Available to give</div></div>
         <div class="tile"><div class="n" id="iGiven">–</div><div class="l">Given out</div></div>
         <div class="tile warn"><div class="n" id="iNeed">–</div><div class="l">Need details</div></div>
@@ -156,6 +172,17 @@
       <div id="invStatus" style="font-size:13px;color:var(--muted);text-align:center"></div>
     </div>
 
+    <!-- All toys in the Sheet, each with Remove (and −1 when there's more than one) -->
+    <div id="allPane" hidden style="display:flex;flex-direction:column;gap:12px">
+      <div class="card">
+        <div><h3 id="allTitle">All toys</h3><p class="sub">Remove takes the toy off the Sheet. −1 takes one off its quantity.</p></div>
+        <input id="allSearch" type="search" placeholder="Search name or barcode">
+        <ul id="allList"></ul>
+      </div>
+      <div id="allStatus" style="font-size:13px;color:var(--muted);text-align:center"></div>
+      <button class="btn alt" id="allBack">← Back to Inventory</button>
+    </div>
+
     <a class="link" href="signup.html">← Back to the sign-up page</a>
   </div>
 </main>
@@ -168,7 +195,7 @@
   ];
   /* ================================================================================================================ */
 
-  const APP_VERSION = 'toys v5';
+  const APP_VERSION = 'toys v6';
   const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
   const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card'];
   const $ = id => document.getElementById(id);
@@ -178,7 +205,7 @@
   // The old setup kept a name and passcode on the phone; they're no longer used.
   try { localStorage.removeItem('tds_name'); localStorage.removeItem('tds_pass'); } catch (e) {}
 
-  // Location and admin passcode handed over by the sign-up page's Admin login (this browser tab only).
+  // Location and toy passcode handed over by Toy Inventory on the sign-up page (this browser tab only).
   let access = null;
   try { access = JSON.parse(sessionStorage.getItem('wbo_toy') || 'null'); } catch (e) {}
   const loc = access && LOCATIONS.find(l => l.name === access.loc);
@@ -187,18 +214,18 @@
     const res = await fetch(loc.url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight Apps Script can't answer
-      body: JSON.stringify(Object.assign({ adminCode: access.code }, body))
+      body: JSON.stringify(Object.assign({ toyCode: access.code }, body))
     });
     return res.json();
   }
   function lockOut(err) {
     try { sessionStorage.removeItem('wbo_toy'); } catch (e) {}
     stopCamera();
-    $('gateMsg').innerHTML = (err === 'admin_locked' ? 'Too many wrong admin passcodes. Wait 15 minutes, then ' : 'The admin passcode was changed. ') +
-      'Open the toy scanner again from the sign-up page: <b>Admin login</b>, then <b>Toy scanner</b>.';
+    $('gateMsg').innerHTML = (err === 'toy_locked' ? 'Too many wrong toy passcodes. Wait 15 minutes, then ' : 'The toy passcode was changed. ') +
+      'Open the toy scanner again from the sign-up page: choose your location, then use <b>Toy Inventory</b>.';
     $('app').hidden = true; $('gate').hidden = false;
   }
-  const isAccessError = r => r && (r.error === 'wrong_admin_code' || r.error === 'admin_locked');
+  const isAccessError = r => r && (r.error === 'wrong_toy_code' || r.error === 'toy_locked');
 
   /* ---------- Gift size from a price ---------- */
   function sizeForPrice(p) {
@@ -218,7 +245,7 @@
     $('mInv').classList.toggle('on', m === 'inv');
     if (formOpen) closeForm();
     const inv = m === 'inv';
-    $('invPane').hidden = !inv; $('scanPane').hidden = inv; $('scanExtras').hidden = inv;
+    $('invPane').hidden = !inv; $('allPane').hidden = true; $('scanPane').hidden = inv; $('scanExtras').hidden = inv;
     if (inv) { stopCamera(); loadInventory(); return; }
     status(m === 'batch' ? 'Batch scan: each barcode saves with a beep. Finish the details later in Inventory.' : 'Quick add: scan a toy, then pick who it\'s for, the age and the size.');
   }
@@ -286,9 +313,12 @@
   function onScan(code) {
     code = String(code).trim();
     if (!code || formOpen) return;
+    // The same barcode counts again only after it has been out of view for a moment: every read of it
+    // restarts the wait, so a toy held in front of the camera counts once.
     const now = Date.now();
-    if (code === lastCode && now - lastAt < 3000) return; // same toy still in view
+    const stillInView = code === lastCode && now - lastAt < 2500;
     lastCode = code; lastAt = now;
+    if (stillInView) return;
     beep(true);
     if (mode === 'batch') { saveBatch(code); return; }
     openForm({ barcode: code });
@@ -307,6 +337,7 @@
       if (isAccessError(r)) { lockOut(r.error); return false; }
       if (r.ok) {
         setRecent(li, item.row ? 'Details saved' : r.merged ? 'Added · now ' + r.qty : 'Saved', 'ok');
+        if (!item.row) addRemove(li, item);
         showCount(r.total);
         if (item.row) invData = r;
         return true;
@@ -342,6 +373,25 @@
     }
   }
 
+  // Remove next to a saved scan: takes that one scan back (1 off the toy's Qty, or the row if it was the only one).
+  function addRemove(li, item) {
+    const b = document.createElement('button');
+    b.className = 'rm'; b.textContent = 'Remove';
+    b.onclick = async () => {
+      if (!confirm('Remove this scan?\n\n' + li.querySelector('.code').textContent + '\n\nThis takes 1 off that toy in the Sheet.')) return;
+      b.disabled = true;
+      try {
+        const r = await api({ action: 'removeToy', toy: { barcode: item.barcode, one: true } });
+        if (isAccessError(r)) { lockOut(r.error); return; }
+        if (!r.ok) { b.disabled = false; status('Couldn\'t remove it: ' + r.error, true); return; }
+        li.classList.add('gone');
+        setRecent(li, r.removed === 'none' ? 'Already gone' : r.removed === 'one' ? 'Removed · now ' + r.qty : 'Removed', '');
+        showCount(r.total); invData = r;
+      } catch (e) { b.disabled = false; status('Couldn\'t reach the Sheet. Try again.', true); }
+    };
+    li.querySelector('.right').append(' ', b);
+  }
+
   /* ---------- Toy form: a new scan (Quick add) or a toy from Needs info ---------- */
   function openForm(toy) {
     formOpen = true;
@@ -353,6 +403,7 @@
     $('fName').value = toy.name || '';
     $('fPrice').value = toy.price === '' || toy.price == null ? '' : toy.price;
     $('fAmz').href = 'https://www.amazon.com/s?k=' + encodeURIComponent(toy.name || toy.barcode);
+    $('fPrices').innerHTML = ''; $('fPricesBox').hidden = true;
     setChoice('forWho', toy.forWho || ''); setChoice('age', toy.age || ''); setChoice('size', toy.size || '');
     $('saveBtn').textContent = toy.row ? 'Save details' : 'Save toy';
     $('form').hidden = false;
@@ -367,10 +418,28 @@
       if (!$('fName').value) $('fName').value = r.name;
       current.brand = r.brand;
       if (r.price !== '' && r.price != null && !$('fPrice').value) { $('fPrice').value = r.price; $('fPrice').oninput(); }
+      showPrices(r.prices || []);
       if (/gift\s*card/i.test(r.name)) { setChoice('size', 'Gift Card'); setChoice('age', '15-18'); }
-      status('Found it' + (r.price ? ' ($' + r.price + ', size picked from the price)' : '') + '. Pick who it\'s for and the age.');
+      status('Found it' + (r.price ? ' ($' + r.price + ', size picked from the price)' : '') + '. ' +
+        ((r.prices || []).length > 1 ? 'If the tag is different, tap the matching store price or type it. ' : '') + 'Pick who it\'s for and the age.');
     }).catch(() => status('Pick who it\'s for, the age and the size.'));
   }
+  // Store prices from the lookup, as buttons: tapping one sets the price (and so the size).
+  function showPrices(list) {
+    const box = $('fPrices'); box.innerHTML = '';
+    list.forEach(x => {
+      const b = document.createElement('button');
+      b.textContent = x.store + ' $' + Number(x.price).toFixed(2);
+      b.classList.toggle('on', Number($('fPrice').value) === x.price);
+      b.onclick = () => {
+        $('fPrice').value = x.price; $('fPrice').oninput();
+        box.querySelectorAll('button').forEach(o => o.classList.toggle('on', o === b));
+      };
+      box.append(b);
+    });
+    $('fPricesBox').hidden = !list.length;
+  }
+
   function closeForm() {
     const wasEdit = current && current.row;
     formOpen = false; current = null;
@@ -407,6 +476,7 @@
       if (!r.ok) { $('invStatus').textContent = 'The Sheet answered with an error: ' + r.error; return; }
       invData = r;
       renderInventory();
+      if (!$('allPane').hidden) renderAll();
       $('invStatus').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     } catch (e) { $('invStatus').textContent = 'Couldn\'t reach the Sheet. Check the internet connection.'; }
   }
@@ -451,6 +521,44 @@
     $('iSizes').innerHTML = bySize.map(([s, n]) =>
       '<div class="bar"><span>' + s + '</span><div class="track"><div class="fill" style="width:' + (n / max * 100) + '%"></div></div><span class="n">' + n + '</span></div>').join('');
   }
+  /* ---------- All toys (from the Toys collected tile) ---------- */
+  function openAll() { if (!invData) return; $('invPane').hidden = true; $('allPane').hidden = false; $('allSearch').value = ''; renderAll(); window.scrollTo(0, 0); }
+  $('iToysTile').onclick = openAll;
+  $('iToysTile').onkeydown = e => { if (e.key === 'Enter') openAll(); };
+  $('allBack').onclick = () => { $('allPane').hidden = true; $('invPane').hidden = false; renderInventory(); };
+  $('allSearch').oninput = () => renderAll();
+  function renderAll() {
+    const q = $('allSearch').value.trim().toLowerCase();
+    const rows = invData.rows.filter(r => !q || (r.name + ' ' + r.brand + ' ' + r.barcode).toLowerCase().indexOf(q) >= 0)
+      .slice().sort((a, b) => b.row - a.row); // newest first
+    $('allTitle').textContent = 'All toys (' + invData.rows.reduce((s, r) => s + r.qty, 0) + ')';
+    const ul = $('allList'); ul.innerHTML = '';
+    if (!rows.length) { ul.innerHTML = '<li>' + (q ? 'No toys match.' : 'No toys yet.') + '</li>'; return; }
+    rows.forEach(r => {
+      const li = document.createElement('li');
+      li.innerHTML = '<div class="what"><div class="nm"></div><div class="dt"></div></div><div class="acts"></div>';
+      li.querySelector('.nm').textContent = (r.name || r.barcode) + (r.qty > 1 ? ' ×' + r.qty : '');
+      li.querySelector('.dt').textContent = [r.name ? r.barcode : '', r.forWho, r.age, r.size, r.price !== '' ? '$' + Number(r.price).toFixed(2) : '', r.given ? r.given + ' given' : '']
+        .filter(Boolean).join(' · ') || 'Needs info';
+      const acts = li.querySelector('.acts');
+      if (r.qty > 1) { const m = document.createElement('button'); m.textContent = '−1'; m.onclick = () => removeFromAll(r, true); acts.append(m); }
+      const rm = document.createElement('button'); rm.className = 'rm'; rm.textContent = 'Remove'; rm.onclick = () => removeFromAll(r, false); acts.append(rm);
+      ul.append(li);
+    });
+  }
+  async function removeFromAll(r, one) {
+    const label = (r.name || r.barcode) + (r.qty > 1 && !one ? ' (all ' + r.qty + ')' : '');
+    if (!confirm((one ? 'Take 1 off ' : 'Remove ') + label + '?\n\n' + (one ? 'It will have ' + (r.qty - 1) + ' left.' : 'This takes it off the Sheet.'))) return;
+    $('allStatus').textContent = 'Saving…';
+    try {
+      const res = await api({ action: 'removeToy', toy: { barcode: r.barcode, row: r.row, one: one } });
+      if (isAccessError(res)) { lockOut(res.error); return; }
+      if (!res.ok) { $('allStatus').textContent = 'Couldn\'t remove it: ' + res.error; return; }
+      invData = res; showCount(res.total); renderAll();
+      $('allStatus').textContent = res.removed === 'none' ? 'That toy was already gone.' : one ? 'Took 1 off.' : 'Removed.';
+    } catch (e) { $('allStatus').textContent = 'Couldn\'t reach the Sheet. Try again.'; }
+  }
+
   setInterval(() => { if (mode === 'inv' && !formOpen && !$('app').hidden && !document.hidden) loadInventory(); }, 30000);
 
   /* ---------- Photo fallback ---------- */

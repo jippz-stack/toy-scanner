@@ -49,6 +49,11 @@
   .link { background:none; border:0; color:var(--muted); font-size:13px; text-decoration:underline; padding:0; align-self:center; }
   .foot { display:flex; justify-content:center; gap:22px; }
   /* Admin login box */
+  #toyBox { position:fixed; inset:0; background:rgba(29,36,32,.55); display:flex; align-items:center; justify-content:center; padding:16px; z-index:20; }
+  #toyBox .card { width:100%; max-width:340px; }
+  #toyBox .row { display:flex; gap:8px; }
+  #toyBox .row .btn { flex:1; }
+  .btn.toy { background:var(--green); }
   #adminBox { position:fixed; inset:0; background:rgba(29,36,32,.55); display:flex; align-items:center; justify-content:center; padding:16px; z-index:20; }
   #adminBox .card { width:100%; max-width:340px; }
   #adminBox .row { display:flex; gap:8px; }
@@ -100,7 +105,7 @@
   </div>
 
   <div class="card" id="setup" hidden>
-    <div class="lbl">Sign in this phone</div>
+    <div class="lbl">Wonder Box Inventory</div>
     <div id="setLoc"></div>
     <div id="setWhy" class="sub"></div>
     <div><label for="setPass">Passcode</label><input id="setPass" type="password" autocomplete="off" placeholder="A leader types this in"></div>
@@ -112,6 +117,15 @@
     </div>
   </div>
 
+  <!-- Toy Inventory: the toy scanner, with its own passcode (App Settings → Toy passcode) -->
+  <div class="card" id="toyCard" hidden>
+    <div class="lbl">Toy Inventory</div>
+    <div class="sub">Scan donated toys and see what's on hand.</div>
+    <div><label for="toyPass">Toy passcode</label><input id="toyPass" type="password" autocomplete="off" autocapitalize="off"></div>
+    <button class="btn toy" id="toyGo">🧸 Open toy scanner</button>
+    <div id="toyMsg" style="font-size:14px;color:var(--red)"></div>
+  </div>
+
   <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
     <div id="cats"></div>
     <div id="status"></div>
@@ -119,13 +133,13 @@
     <ul id="recent"></ul>
     <div class="foot">
       <button class="link" id="changeSetup">Sign out this phone</button>
+      <button class="link" id="toyLink">Toy Inventory</button>
       <button class="link" id="adminLink">Admin login</button>
     </div>
   </div>
 
   <!-- Admin page: KPIs (needs the admin passcode) -->
   <div id="admin" hidden>
-    <button class="btn" id="toyBtn" style="background:var(--green);font-size:18px;padding:16px">🧸 Toy scanner</button>
     <div class="tiles">
       <div class="tile"><div class="n" id="kTotal">–</div><div class="l">Overall total</div><div class="s" id="kTotalS"></div></div>
       <div class="tile"><div class="n" id="kToday">–</div><div class="l">Today</div><div class="s" id="kTodayS"></div></div>
@@ -150,6 +164,15 @@
     <button class="btn alt" id="adminBack">← Back to sign-ups</button>
   </div>
 </main>
+
+<div id="toyBox" hidden>
+  <div class="card">
+    <div class="lbl">Toy Inventory</div>
+    <div><label for="toyPass2">Toy passcode</label><input id="toyPass2" type="password" autocomplete="off" autocapitalize="off"></div>
+    <div id="toyMsg2" style="font-size:14px;color:var(--red);min-height:18px"></div>
+    <div class="row"><button class="btn alt" id="toyCancel">Cancel</button><button class="btn toy" id="toyGo2">Open</button></div>
+  </div>
+</div>
 
 <div id="adminBox" hidden>
   <div class="card">
@@ -211,14 +234,15 @@
     sheetCounts = null; today = null; total = null; // the other location's numbers don't apply
   }
   function showPick() {
-    $('pick').hidden = false; $('setup').hidden = true; $('app').hidden = true; $('admin').hidden = true;
+    $('pick').hidden = false; $('setup').hidden = true; $('toyCard').hidden = true; $('app').hidden = true; $('admin').hidden = true;
     $('today').textContent = ''; $('total').textContent = '';
   }
   function showSetup(why) {
     if (!locUrl()) { showPick(); return; }
     $('setLoc').textContent = place;
     $('setPass').value = ''; $('setMsg').textContent = ''; $('setWhy').textContent = why || '';
-    $('pick').hidden = true; $('setup').hidden = false; $('app').hidden = true; $('admin').hidden = true;
+    $('toyPass').value = ''; $('toyMsg').textContent = '';
+    $('pick').hidden = true; $('setup').hidden = false; $('toyCard').hidden = false; $('app').hidden = true; $('admin').hidden = true;
     $('today').textContent = ''; $('total').textContent = '';
   }
   function signOut(why) {
@@ -231,7 +255,7 @@
   function signedOut(r) {
     signOut('This phone was signed out. A leader needs to sign it in again.');
   }
-  function showApp() { $('pick').hidden = true; $('setup').hidden = true; $('admin').hidden = true; $('app').hidden = false; refresh(); }
+  function showApp() { $('pick').hidden = true; $('setup').hidden = true; $('toyCard').hidden = true; $('admin').hidden = true; $('app').hidden = false; refresh(); }
 
   $('setSave').onclick = async () => {
     const p = $('setPass').value.trim();
@@ -429,14 +453,34 @@
     } catch (e) { $('adminMsg').textContent = 'Couldn\'t reach the Sheet. Check the internet connection.'; }
     $('adminGo').disabled = false;
   };
-  // The toy scanner (index.html) uses the same location and admin passcode, kept only for this browser tab.
-  $('toyBtn').onclick = () => {
-    try { sessionStorage.setItem('wbo_toy', JSON.stringify({ loc: place, code: adminCode })); } catch (e) {}
-    window.location.href = 'index.html';
-  };
+  /* ---------- Toy Inventory: the Sheet checks the toy passcode, then the toy scanner opens ---------- */
+  // The scanner (index.html) gets this location and the toy passcode for this browser tab only.
+  async function openToys(input, msg, btn) {
+    const code = input.value.trim();
+    if (!code) { msg.textContent = 'Type the toy passcode.'; return; }
+    btn.disabled = true; msg.textContent = '';
+    try {
+      const r = await api({ action: 'toyLogin', toyCode: code });
+      if (r.ok) {
+        try { sessionStorage.setItem('wbo_toy', JSON.stringify({ loc: place, code: code })); } catch (e) {}
+        window.location.href = 'index.html';
+        return;
+      }
+      msg.textContent = r.error === 'wrong_toy_code' ? 'That toy passcode isn\'t right.'
+        : r.error === 'toy_locked' ? 'Too many wrong tries. Wait 15 minutes and try again.'
+        : 'The Sheet answered with an error: ' + r.error;
+    } catch (e) { msg.textContent = 'Couldn\'t reach the Sheet. Check the internet connection.'; }
+    btn.disabled = false;
+  }
+  $('toyGo').onclick = () => openToys($('toyPass'), $('toyMsg'), $('toyGo'));
+  $('toyPass').onkeydown = e => { if (e.key === 'Enter') $('toyGo').click(); };
+  $('toyLink').onclick = () => { $('toyPass2').value = ''; $('toyMsg2').textContent = ''; $('toyBox').hidden = false; $('toyPass2').focus(); };
+  $('toyCancel').onclick = () => { $('toyBox').hidden = true; };
+  $('toyGo2').onclick = () => openToys($('toyPass2'), $('toyMsg2'), $('toyGo2'));
+  $('toyPass2').onkeydown = e => { if (e.key === 'Enter') $('toyGo2').click(); };
   $('adminBack').onclick = () => { adminCode = ''; adminData = null; if (session) showApp(); else showSetup(); };
 
-  function showAdmin(d) { $('app').hidden = true; $('pick').hidden = true; $('setup').hidden = true; $('admin').hidden = false; window.scrollTo(0, 0); renderAdmin(d); }
+  function showAdmin(d) { $('app').hidden = true; $('pick').hidden = true; $('setup').hidden = true; $('toyCard').hidden = true; $('admin').hidden = false; window.scrollTo(0, 0); renderAdmin(d); }
   async function adminRefresh() {
     try {
       const r = await api({ action: 'adminData', adminCode: adminCode });
