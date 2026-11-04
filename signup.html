@@ -15,7 +15,8 @@
   #locs button { min-height:110px; border:0; border-radius:14px; background:var(--green); color:#fff; font-size:24px; font-weight:700; cursor:pointer; touch-action:manipulation; }
   #locs button:nth-child(even) { background:#0f5257; }
   #locs button:active { transform:scale(.97); }
-  #setLoc { font-size:22px; font-weight:700; color:var(--green); }
+  .cardHead { font-size:22px; font-weight:700; color:var(--green); }
+  #setLoc { font-size:14px; font-weight:600; color:var(--green); margin-top:-6px; }
   .hright { text-align:right; line-height:1.3; font-size:13px; font-variant-numeric: tabular-nums; white-space:nowrap; }
   main { padding:16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); display:flex; flex-direction:column; gap:14px; max-width:560px; margin:0 auto; }
   .btn { display:block; width:100%; padding:14px; font-size:16px; border-radius:10px; border:0; background:var(--red); color:#fff; font-weight:600; text-align:center; cursor:pointer; }
@@ -105,7 +106,7 @@
   </div>
 
   <div class="card" id="setup" hidden>
-    <div class="lbl">Wonder Box Inventory</div>
+    <div class="cardHead">Wonder Box Inventory</div>
     <div id="setLoc"></div>
     <div id="setWhy" class="sub"></div>
     <div><label for="setPass">Passcode</label><input id="setPass" type="password" autocomplete="off" placeholder="A leader types this in"></div>
@@ -119,7 +120,7 @@
 
   <!-- Toy Inventory: the toy scanner, with its own passcode (App Settings → Toy passcode) -->
   <div class="card" id="toyCard" hidden>
-    <div class="lbl">Toy Inventory</div>
+    <div class="cardHead">Toy Inventory</div>
     <div class="sub">Scan donated toys and see what's on hand.</div>
     <div><label for="toyPass">Toy passcode</label><input id="toyPass" type="password" autocomplete="off" autocapitalize="off"></div>
     <button class="btn toy" id="toyGo">🧸 Open toy scanner</button>
