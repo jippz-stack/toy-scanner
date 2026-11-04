@@ -175,7 +175,7 @@
     <!-- All toys in the Sheet, each with Remove (and −1 when there's more than one) -->
     <div id="allPane" hidden style="display:flex;flex-direction:column;gap:12px">
       <div class="card">
-        <div><h3 id="allTitle">All toys</h3><p class="sub">Remove takes the toy off the Sheet. −1 takes one off its quantity.</p></div>
+        <div><h3 id="allTitle">All toys</h3><p class="sub">Remove 1 takes one off a toy you have several of. Remove all (or Remove) takes the toy off the Sheet.</p></div>
         <input id="allSearch" type="search" placeholder="Search name or barcode">
         <ul id="allList"></ul>
       </div>
@@ -195,7 +195,7 @@
   ];
   /* ================================================================================================================ */
 
-  const APP_VERSION = 'toys v6';
+  const APP_VERSION = 'toys v7';
   const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
   const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card'];
   const $ = id => document.getElementById(id);
@@ -541,21 +541,23 @@
       li.querySelector('.dt').textContent = [r.name ? r.barcode : '', r.forWho, r.age, r.size, r.price !== '' ? '$' + Number(r.price).toFixed(2) : '', r.given ? r.given + ' given' : '']
         .filter(Boolean).join(' · ') || 'Needs info';
       const acts = li.querySelector('.acts');
-      if (r.qty > 1) { const m = document.createElement('button'); m.textContent = '−1'; m.onclick = () => removeFromAll(r, true); acts.append(m); }
-      const rm = document.createElement('button'); rm.className = 'rm'; rm.textContent = 'Remove'; rm.onclick = () => removeFromAll(r, false); acts.append(rm);
+      // With more than one: "Remove 1" takes one off; "Remove all" takes the toy off the Sheet.
+      if (r.qty > 1) { const m = document.createElement('button'); m.textContent = 'Remove 1'; m.onclick = () => removeFromAll(r, true); acts.append(m); }
+      const rm = document.createElement('button'); rm.className = 'rm'; rm.textContent = r.qty > 1 ? 'Remove all' : 'Remove'; rm.onclick = () => removeFromAll(r, false); acts.append(rm);
       ul.append(li);
     });
   }
   async function removeFromAll(r, one) {
     const label = (r.name || r.barcode) + (r.qty > 1 && !one ? ' (all ' + r.qty + ')' : '');
-    if (!confirm((one ? 'Take 1 off ' : 'Remove ') + label + '?\n\n' + (one ? 'It will have ' + (r.qty - 1) + ' left.' : 'This takes it off the Sheet.'))) return;
+    if (!confirm((one ? 'Remove 1 of ' + (r.name || r.barcode) : 'Remove ' + label) + '?\n\n' +
+      (one ? (r.qty - 1) + ' will be left.' : 'This takes it off the Sheet completely.'))) return;
     $('allStatus').textContent = 'Saving…';
     try {
       const res = await api({ action: 'removeToy', toy: { barcode: r.barcode, row: r.row, one: one } });
       if (isAccessError(res)) { lockOut(res.error); return; }
       if (!res.ok) { $('allStatus').textContent = 'Couldn\'t remove it: ' + res.error; return; }
       invData = res; showCount(res.total); renderAll();
-      $('allStatus').textContent = res.removed === 'none' ? 'That toy was already gone.' : one ? 'Took 1 off.' : 'Removed.';
+      $('allStatus').textContent = res.removed === 'none' ? 'That toy was already gone.' : one ? 'Removed 1 (' + res.qty + ' left).' : 'Removed.';
     } catch (e) { $('allStatus').textContent = 'Couldn\'t reach the Sheet. Try again.'; }
   }
 
