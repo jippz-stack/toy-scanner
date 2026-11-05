@@ -15,7 +15,7 @@
   header .loc { font-size:13px; opacity:.85; margin-top:2px; }
   .hright { text-align:right; line-height:1.25; font-size:13px; }
   main { padding:16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); display:flex; flex-direction:column; gap:14px; max-width:520px; margin:0 auto; }
-  .mode { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .mode { display:grid; grid-template-columns:1fr 1fr 1fr; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
   .mode button { border:0; padding:12px 4px; font-size:15px; background:var(--card); color:var(--fg); }
   .mode button.on { background:var(--fg); color:#fff; }
   #reader { width:100%; border-radius:10px; overflow:hidden; background:#000; }
@@ -96,6 +96,23 @@
   #allList .acts { display:flex; gap:6px; flex-shrink:0; }
   #allList button { font-size:13px; padding:6px 10px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--fg); }
   #allList button.rm { color:var(--red); border-color:#e8c4c1; }
+  .csum { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; text-align:center; }
+  .csum .n { font-size:26px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .csum .l { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  #countRecent, #cList { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+  #countRecent li, #cList li { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); font-size:14px; }
+  #countRecent .st { font-size:12px; color:var(--muted); white-space:nowrap; }
+  #countRecent .st.bad { color:var(--red); }
+  #countRecent button, #cList button { font-size:14px; min-width:40px; padding:6px 10px; border-radius:6px; border:1px solid var(--line); background:var(--card); color:var(--fg); }
+  #cList .what { min-width:0; flex:1; }
+  #cList .nm { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #cList .dt { font-size:12px; color:var(--muted); }
+  #cList .ctl { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  #cList .ctl b { min-width:24px; text-align:center; font-variant-numeric:tabular-nums; }
+  .abtns { display:flex; flex-direction:column; gap:8px; }
+  .abtns .btn { font-size:15px; padding:12px; }
+  #cAdminBox { position:fixed; inset:0; background:rgba(29,36,32,.55); display:flex; align-items:center; justify-content:center; padding:16px; z-index:20; }
+  #cAdminBox .card { width:100%; max-width:360px; }
   [hidden] { display:none !important; }
 </style>
 </head>
@@ -117,6 +134,7 @@
     <div class="mode">
       <button id="mQuick" class="on">Quick add</button>
       <button id="mInv">Inventory</button>
+      <button id="mCount">Leftovers</button>
     </div>
 
     <div id="scanPane" style="display:flex;flex-direction:column;gap:14px">
@@ -163,6 +181,40 @@
       <img id="preview" hidden alt="Photo the reader saw" style="width:100%;border-radius:10px;border:1px solid var(--line)">
     </div>
 
+    <!-- Count leftovers (after the event): each scan adds 1 to that toy's leftover count -->
+    <div id="countPane" hidden style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <div><h3>Leftover count</h3><p class="sub">Scan every toy that's left after the event. Each scan counts 1.</p></div>
+        <div class="csum">
+          <div><div class="n" id="cCollected">–</div><div class="l">Collected</div></div>
+          <div><div class="n" id="cLeft">–</div><div class="l">Left over</div></div>
+          <div><div class="n" id="cGiven">–</div><div class="l">Given out*</div></div>
+        </div>
+        <p class="sub">*Given out = collected minus left over. It's only right once every leftover has been counted.</p>
+      </div>
+      <ul id="countRecent"></ul>
+      <div class="row">
+        <input id="cManual" inputmode="numeric" placeholder="Type a barcode">
+        <button class="btn alt" id="cManualBtn">Count</button>
+      </div>
+      <div class="card">
+        <div><h3>No barcode, or it won't scan?</h3><p class="sub">Find the toy and use + or −.</p></div>
+        <input id="cSearch" type="search" placeholder="Search toy name or barcode">
+        <ul id="cList"></ul>
+        <button class="btn alt" id="cNewBtn">➕ A leftover that isn't in the inventory</button>
+      </div>
+      <div class="card">
+        <div><h3>When counting is done</h3><p class="sub">These need the admin passcode.</p></div>
+        <div class="abtns">
+          <button class="btn" id="cApply" style="background:var(--green)">Apply results to the inventory</button>
+          <button class="btn alt" id="cReset">Start a new count</button>
+          <button class="btn alt" id="cNext" style="color:var(--red)">Start next year with the leftovers</button>
+        </div>
+        <div id="cAdminMsg" style="font-size:14px"></div>
+      </div>
+      <div id="countStatus" style="font-size:13px;color:var(--muted);text-align:center"></div>
+    </div>
+
     <!-- Inventory: totals, what's on hand, and toys that still need details -->
     <div id="invPane" hidden style="display:flex;flex-direction:column;gap:14px">
       <div class="tiles">
@@ -203,6 +255,16 @@
   </div>
 </main>
 
+<div id="cAdminBox" hidden>
+  <div class="card">
+    <div class="lbl" id="cAdminTitle">Admin</div>
+    <div id="cAdminWhat" style="font-size:14px"></div>
+    <div><label for="cAdminCode">Admin passcode</label><input id="cAdminCode" type="password" autocomplete="off"></div>
+    <div id="cAdminErr" style="font-size:14px;color:var(--red);min-height:18px"></div>
+    <div class="row"><button class="btn alt" id="cAdminCancel" style="flex:1">Cancel</button><button class="btn" id="cAdminGo" style="flex:1">Yes, do it</button></div>
+  </div>
+</div>
+
 <script>
   /* ====== Each location's Sheet (same list as signup.html; links from locations.json in the toy drive app) ====== */
   const LOCATIONS = [
@@ -211,7 +273,7 @@
   ];
   /* ================================================================================================================ */
 
-  const APP_VERSION = 'toys v14';
+  const APP_VERSION = 'toys v15';
   const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
   const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card', 'Bible', 'Bike'];
   const PRICE_SIZES = ['', 'Stocking', 'Small', 'Medium', 'Large']; // a price only picks among these
@@ -267,14 +329,18 @@
   let mode = 'quick', current = null, formOpen = false;
   $('mQuick').onclick = () => setMode('quick');
   $('mInv').onclick = () => setMode('inv');
+  $('mCount').onclick = () => setMode('count');
   function setMode(m) {
     mode = m;
     $('mQuick').classList.toggle('on', m === 'quick');
     $('mInv').classList.toggle('on', m === 'inv');
+    $('mCount').classList.toggle('on', m === 'count');
     if (formOpen) closeForm();
     const inv = m === 'inv';
-    $('invPane').hidden = !inv; $('allPane').hidden = true; $('scanPane').hidden = inv; $('scanExtras').hidden = inv;
+    $('invPane').hidden = !inv; $('allPane').hidden = true; $('scanPane').hidden = inv;
+    $('scanExtras').hidden = m !== 'quick'; $('countPane').hidden = m !== 'count';
     if (inv) { stopCamera(); loadInventory(); return; }
+    if (m === 'count') { status('Counting leftovers: scan each toy that\'s left. Each scan counts 1.'); loadCount(); return; }
     status('Quick add: scan a toy, then pick who it\'s for, the age and the size.');
   }
 
@@ -354,6 +420,7 @@
     lastCode = code; lastAt = now;
     if (stillInView) return;
     beep(true);
+    if (mode === 'count') { countOne(code, 1); return; }
     openForm({ barcode: code });
   }
 
@@ -431,21 +498,22 @@
     if (toy.row) current.row = toy.row;
     const noCode = !toy.barcode && !toy.row;
     const nbId = /^NB-/.test(toy.barcode || '');
-    $('fTitle').textContent = toy.row ? (editFrom === 'all' ? 'Edit toy' : 'Finish details') : noCode ? 'Add a toy without a barcode' : 'Barcode';
+    const countNew = from === 'countNew'; current.countNew = countNew;
+    $('fTitle').textContent = countNew ? 'Leftover not in the inventory: add its details' : toy.row ? (editFrom === 'all' ? 'Edit toy' : 'Finish details') : noCode ? 'Add a toy without a barcode' : 'Barcode';
     $('fCode').textContent = noCode ? 'Type the name, then pick the details.' : nbId ? 'No barcode (ID ' + toy.barcode + ')' : toy.barcode;
     $('fCode').style.fontSize = noCode || nbId ? '15px' : '';
-    $('fQty').value = toy.row ? toy.qty : 1; $('fQtyBox').hidden = false;
+    $('fQty').value = toy.row ? toy.qty : 1; $('fQtyBox').hidden = countNew; // a leftover is counted one scan at a time
     $('fName').value = toy.name || ''; $('fNameMsg').hidden = true;
     $('fPrice').value = toy.price === '' || toy.price == null ? '' : toy.price;
     $('fAmz').href = 'https://www.amazon.com/s?k=' + encodeURIComponent(toy.name || toy.barcode);
     $('fPrices').innerHTML = ''; $('fPricesBox').hidden = true;
     setChoice('forWho', toy.forWho || ''); setChoice('age', toy.age || ''); setChoice('size', toy.size || '');
-    $('saveBtn').textContent = toy.row ? 'Save details' : 'Save toy';
+    $('saveBtn').textContent = countNew ? 'Count it' : toy.row ? 'Save details' : 'Save toy';
     $('form').hidden = false;
     if (toy.row) { $('invPane').hidden = true; $('allPane').hidden = true; }
     $('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (toy.row) return;
-    if (noCode) { status('Adding a toy without a barcode. The name is required.'); setTimeout(() => $('fName').focus(), 300); return; }
+    if (noCode) { status(countNew ? 'Type the leftover\'s name and details, then tap Count it.' : 'Adding a toy without a barcode. The name is required.'); setTimeout(() => $('fName').focus(), 300); return; }
     status('Looking up ' + toy.barcode + '…');
     api({ action: 'lookup', barcode: toy.barcode }).then(r => {
       if (isAccessError(r)) { lockOut(r.error); return; }
@@ -498,6 +566,7 @@
     const p = parseFloat($('fPrice').value);
     current.price = isNaN(p) ? '' : p;
     current.qty = Math.max(1, Math.min(999, parseInt($('fQty').value, 10) || 1));
+    if (current.countNew) { const it = current; closeForm(); countOne(it.barcode, 1, it); return; }
     const item = current;
     $('saveBtn').disabled = true;
     const label = (item.barcode && !/^NB-/.test(item.barcode) ? item.barcode + (item.name ? ' · ' + item.name : '') : item.name || item.barcode) + (item.qty > 1 ? ' ×' + item.qty : '');
@@ -512,7 +581,7 @@
     else status(ok ? 'Saved. Scan the next toy.' : 'That one didn\'t save. Tap Retry next to it.', !ok);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  $('skipBtn').onclick = () => { closeForm(); if (mode !== 'inv') status('Cancelled. Scan the next toy.'); };
+  $('skipBtn').onclick = () => { closeForm(); if (mode !== 'inv') status(mode === 'count' ? 'Not counted. Scan the next leftover.' : 'Cancelled. Scan the next toy.'); };
 
   $('fQtyMinus').onclick = () => { $('fQty').value = Math.max(1, (parseInt($('fQty').value, 10) || 1) - 1); };
   $('fQtyPlus').onclick = () => { $('fQty').value = Math.min(999, (parseInt($('fQty').value, 10) || 1) + 1); };
@@ -566,6 +635,131 @@
     $('iSizes').innerHTML = bySize.map(([s, n]) =>
       '<div class="bar"><span>' + s + '</span><div class="track"><div class="fill" style="width:' + (n / max * 100) + '%"></div></div><span class="n">' + n + '</span></div>').join('');
   }
+  /* ---------- Count leftovers ---------- */
+  let countData = null; // { rows: inventory toys, counts: [{barcode, name, left, inInventory, ...}], summary }
+  async function loadCount() {
+    $('countStatus').textContent = 'Loading…';
+    try {
+      const r = await api({ action: 'countData' });
+      if (isAccessError(r)) { lockOut(r.error); return; }
+      if (!r.ok) { $('countStatus').textContent = 'The Sheet answered with an error: ' + r.error; return; }
+      countData = r; renderCount();
+      $('countStatus').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    } catch (e) { $('countStatus').textContent = 'Couldn\'t reach the Sheet. Check the internet connection.'; }
+  }
+  setInterval(() => { if (mode === 'count' && !formOpen && !$('app').hidden && !document.hidden) loadCount(); }, 30000);
+
+  function leftOf(barcode) { const x = countData && countData.counts.find(c => c.barcode === barcode); return x ? x.left : 0; }
+  function renderCount() {
+    if (!countData) return;
+    const sm = countData.summary, counted = countData.counts.length > 0;
+    $('cCollected').textContent = sm.collected;
+    $('cLeft').textContent = sm.left;
+    $('cGiven').textContent = counted ? sm.given : '–';
+    renderCountList();
+  }
+  // Toys to count by hand: everything in the inventory plus leftovers already counted that aren't in it.
+  function renderCountList() {
+    const q = $('cSearch').value.trim().toLowerCase();
+    const items = countData.rows.map(r => ({ barcode: r.barcode, name: r.name, dt: [r.forWho, r.age, r.size].filter(Boolean).join(' · '), qty: r.qty }))
+      .concat(countData.counts.filter(c => !c.inInventory).map(c => ({ barcode: c.barcode, name: c.name, dt: 'not in inventory', qty: null })));
+    const shown = items.filter(x => !q || (x.name + ' ' + x.barcode).toLowerCase().indexOf(q) >= 0)
+      .sort((a, b) => (a.name || a.barcode).localeCompare(b.name || b.barcode)).slice(0, q ? 60 : 20);
+    const ul = $('cList'); ul.innerHTML = '';
+    if (!shown.length) { ul.innerHTML = '<li>' + (q ? 'No toys match.' : 'No toys in the inventory yet.') + '</li>'; return; }
+    shown.forEach(x => {
+      const li = document.createElement('li');
+      li.innerHTML = '<div class="what"><div class="nm"></div><div class="dt"></div></div><div class="ctl"><button aria-label="One less">−</button><b></b><button aria-label="One more">+</button></div>';
+      li.querySelector('.nm').textContent = x.name || x.barcode;
+      li.querySelector('.dt').textContent = (x.dt || 'needs info') + (x.qty != null ? ' · collected ' + x.qty : '');
+      li.querySelector('b').textContent = leftOf(x.barcode);
+      const [minus, plus] = li.querySelectorAll('button');
+      minus.onclick = () => { if (leftOf(x.barcode) > 0) countOne(x.barcode, -1); };
+      plus.onclick = () => countOne(x.barcode, 1);
+      ul.append(li);
+    });
+    if (!q && items.length > shown.length) { const li = document.createElement('li'); li.textContent = 'Showing 20 of ' + items.length + '. Search to find the others.'; ul.append(li); }
+  }
+  $('cSearch').oninput = () => countData && renderCountList();
+
+  // Count one leftover (n = 1) or take one back (n = -1). A toy that isn't in the inventory opens the form first.
+  async function countOne(barcode, n, item) {
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="code"></span><span class="right"><span class="st">Saving…</span></span>';
+    li.querySelector('.code').textContent = item ? item.name : barcode;
+    $('countRecent').prepend(li);
+    while ($('countRecent').children.length > 8) $('countRecent').lastChild.remove();
+    try {
+      const r = await api({ action: 'countScan', barcode: barcode, n: n, item: item || null });
+      if (isAccessError(r)) { lockOut(r.error); return; }
+      if (!r.ok && r.error === 'not_in_inventory') {
+        li.remove(); beep(false);
+        status('That toy isn\'t in the inventory. Add its details to count it.');
+        openForm({ barcode: barcode }, 'countNew');
+        return;
+      }
+      if (!r.ok) { li.querySelector('.st').textContent = 'Not counted'; li.querySelector('.st').classList.add('bad'); beep(false); return; }
+      li.querySelector('.code').textContent = (r.name || r.barcode) + (r.inInventory === false ? ' (not in inventory)' : '');
+      const right = li.querySelector('.right');
+      right.innerHTML = '<span class="st"></span>';
+      right.querySelector('.st').textContent = (n < 0 ? 'Took 1 back · ' : '+1 · ') + 'left ' + r.left;
+      if (n > 0) {
+        const b = document.createElement('button'); b.textContent = 'Remove';
+        b.onclick = () => { b.disabled = true; countOne(r.barcode, -1); li.style.opacity = '.55'; };
+        right.append(' ', b);
+      }
+      // keep the local copy in step
+      const c = countData && countData.counts.find(x => x.barcode === r.barcode);
+      if (countData) {
+        if (c) c.left = r.left; else if (r.left > 0) countData.counts.push({ barcode: r.barcode, name: r.name, left: r.left, inInventory: r.inInventory !== false });
+        countData.counts = countData.counts.filter(x => x.left > 0);
+        countData.summary = r.summary; renderCount();
+      }
+      status(n < 0 ? 'Took one back.' : 'Counted. Scan the next leftover.');
+    } catch (e) { li.querySelector('.st').textContent = 'No connection'; li.querySelector('.st').classList.add('bad'); beep(false); }
+  }
+  $('cManualBtn').onclick = () => { const v = $('cManual').value.trim(); if (v) { $('cManual').value = ''; lastCode = ''; onScan(v); } };
+  $('cNewBtn').onclick = () => { if (!formOpen) openForm({ barcode: '' }, 'countNew'); };
+
+  // The buttons that change the inventory need the admin passcode.
+  let adminAction = null;
+  const ADMIN_ACTIONS = {
+    applyCount: ['Apply results', 'Sets Given out on every toy in the inventory to Collected minus Left over. Do this when all the leftovers have been counted.',
+      r => 'Applied: ' + r.givenTotal + ' toys marked as given out.'],
+    resetCount: ['Start a new count', 'Clears the leftover count so the leftovers can be counted again. The inventory is not changed.', () => 'The leftover count was cleared.'],
+    startNextYear: ['Start next year with the leftovers', 'This year\'s inventory and leftover count are kept under new names (with the year), and a new inventory starts with only the leftover toys and their details. Nothing is deleted.',
+      r => 'Done: the new inventory has ' + r.keptQty + ' toys. This year\'s tabs are now ' + r.archived.join(' and ') + '.']
+  };
+  function askAdmin(action) {
+    adminAction = action;
+    $('cAdminTitle').textContent = ADMIN_ACTIONS[action][0];
+    $('cAdminWhat').textContent = ADMIN_ACTIONS[action][1];
+    $('cAdminCode').value = ''; $('cAdminErr').textContent = ''; $('cAdminBox').hidden = false; $('cAdminCode').focus();
+  }
+  $('cApply').onclick = () => askAdmin('applyCount');
+  $('cReset').onclick = () => askAdmin('resetCount');
+  $('cNext').onclick = () => askAdmin('startNextYear');
+  $('cAdminCancel').onclick = () => { $('cAdminBox').hidden = true; };
+  $('cAdminCode').onkeydown = e => { if (e.key === 'Enter') $('cAdminGo').click(); };
+  $('cAdminGo').onclick = async () => {
+    const code = $('cAdminCode').value.trim();
+    if (!code) { $('cAdminErr').textContent = 'Type the admin passcode.'; return; }
+    $('cAdminGo').disabled = true; $('cAdminErr').textContent = 'Working…';
+    try {
+      const r = await api({ action: adminAction, adminCode: code });
+      if (r.ok) {
+        $('cAdminBox').hidden = true;
+        countData = r; renderCount(); showCount(r.summary.collected);
+        $('cAdminMsg').textContent = ADMIN_ACTIONS[adminAction][2](r);
+      } else {
+        $('cAdminErr').textContent = r.error === 'wrong_admin_code' ? 'That admin passcode isn\'t right.'
+          : r.error === 'admin_locked' ? 'Too many wrong tries. Wait 15 minutes and try again.'
+          : r.error === 'no_count' ? 'Nothing has been counted yet.' : 'The Sheet answered with an error: ' + r.error;
+      }
+    } catch (e) { $('cAdminErr').textContent = 'Couldn\'t reach the Sheet. Try again.'; }
+    $('cAdminGo').disabled = false;
+  };
+
   /* ---------- Available by age and gift size, for Boy / Girl / Either / All ---------- */
   let comboFor = '';
   const SIZE_SHORT = { 'Stocking': 'Stk', 'Small': 'Sm', 'Medium': 'Med', 'Large': 'Lg', 'Gift Card': 'Gift', 'Bible': 'Bible', 'Bike': 'Bike' };
