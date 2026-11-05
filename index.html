@@ -77,8 +77,9 @@
   .seg button { border:0; padding:10px 4px; font-size:14px; background:var(--card); color:var(--fg); }
   .seg button + button { border-left:1px solid var(--line); }
   .seg button.on { background:var(--green); color:#fff; }
-  #iCombo table td, #iCombo table th { padding:7px 3px; }
-  #iCombo table th { font-size:11px; }
+  #iCombo table td, #iCombo table th { padding:7px 2px; }
+  #iCombo table td { font-size:14px; }
+  #iCombo table th { font-size:10px; }
   #recent li.gone .code { text-decoration:line-through; color:var(--muted); }
   #recent .rm { color:var(--red); border-color:#e8c4c1; }
   .chips { display:flex; flex-wrap:wrap; gap:6px; }
@@ -143,6 +144,8 @@
           <button data-v="Medium">Medium<span class="hint">$15–24.99</span></button>
           <button data-v="Large">Large<span class="hint">$25+</span></button>
           <button data-v="Gift Card">Gift Card<span class="hint">teens 15-18</span></button>
+          <button data-v="Bible">📖 Bible</button>
+          <button data-v="Bike">🚲 Bike</button>
         </div></div>
       <button class="btn" id="saveBtn">Save toy</button>
       <button class="btn alt" id="skipBtn">Cancel</button>
@@ -176,7 +179,7 @@
         <div><h3>Available by age and gift size</h3><p class="sub">How many toys are on hand for each age and size. Pick who they're for.</p></div>
         <div class="seg" id="iForSeg"><button data-f="Boy">Boy</button><button data-f="Girl">Girl</button><button data-f="Either">Either</button><button data-f="" class="on">All</button></div>
         <div id="iCombo"></div>
-        <p class="sub">Stock = Stocking (under $5) · Sm = Small ($5–14.99) · Med = Medium ($15–24.99) · Lg = Large ($25+) · Gift = Gift Card</p>
+        <p class="sub">Stk = Stocking (under $5) · Sm = Small ($5–14.99) · Med = Medium ($15–24.99) · Lg = Large ($25+) · Gift = Gift Card</p>
       </div>
       <div class="card">
         <div><h3>Available by age</h3><p class="sub">Toys still on hand with their details filled in.</p></div>
@@ -212,9 +215,10 @@
   ];
   /* ================================================================================================================ */
 
-  const APP_VERSION = 'toys v11';
+  const APP_VERSION = 'toys v12';
   const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
-  const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card'];
+  const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card', 'Bible', 'Bike'];
+  const PRICE_SIZES = ['', 'Stocking', 'Small', 'Medium', 'Large']; // a price only picks among these
   const $ = id => document.getElementById(id);
   const status = (t, err) => { $('status').textContent = t; $('status').classList.toggle('err', !!err); };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -279,7 +283,11 @@
     });
   });
   $('fName').addEventListener('input', () => { if ($('fName').value.trim()) $('fNameMsg').hidden = true; });
-  $('fPrice').oninput = () => { const sz = sizeForPrice(parseFloat($('fPrice').value)); if (sz) setChoice('size', sz); };
+  // A price picks Stocking/Small/Medium/Large, but never replaces Gift Card, Bible or Bike once chosen.
+  $('fPrice').oninput = () => {
+    if (current && PRICE_SIZES.indexOf(current.size || '') < 0) return;
+    const sz = sizeForPrice(parseFloat($('fPrice').value)); if (sz) setChoice('size', sz);
+  };
 
   /* ---------- Beep (needs a tap first on iPhone) ---------- */
   let audio = null;
@@ -559,7 +567,7 @@
   }
   /* ---------- Available by age and gift size, for Boy / Girl / Either / All ---------- */
   let comboFor = '';
-  const SIZE_SHORT = { 'Stocking': 'Stock', 'Small': 'Sm', 'Medium': 'Med', 'Large': 'Lg', 'Gift Card': 'Gift' };
+  const SIZE_SHORT = { 'Stocking': 'Stk', 'Small': 'Sm', 'Medium': 'Med', 'Large': 'Lg', 'Gift Card': 'Gift', 'Bible': 'Bible', 'Bike': 'Bike' };
   document.querySelectorAll('#iForSeg button').forEach(b => b.onclick = () => {
     comboFor = b.dataset.f;
     document.querySelectorAll('#iForSeg button').forEach(x => x.classList.toggle('on', x === b));
