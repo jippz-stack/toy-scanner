@@ -182,10 +182,6 @@
         <p class="sub">Stk = Stocking (under $5) · Sm = Small ($5–14.99) · Med = Medium ($15–24.99) · Lg = Large ($25+) · Gift = Gift Card</p>
       </div>
       <div class="card">
-        <div><h3>Available by age</h3><p class="sub">Toys still on hand with their details filled in.</p></div>
-        <div id="iAges"></div>
-      </div>
-      <div class="card">
         <div><h3>Available by gift size</h3></div>
         <div id="iSizes"></div>
       </div>
@@ -215,7 +211,7 @@
   ];
   /* ================================================================================================================ */
 
-  const APP_VERSION = 'toys v13';
+  const APP_VERSION = 'toys v14';
   const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
   const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card', 'Bible', 'Bike'];
   const PRICE_SIZES = ['', 'Stocking', 'Small', 'Medium', 'Large']; // a price only picks among these
@@ -563,16 +559,6 @@
       ul.append(li);
     });
 
-    const fors = invData.options.forWho;
-    let h = '<table><tr><th>Age</th>' + fors.map(f => '<th class="num">' + esc(f) + '</th>').join('') + '<th class="num">Total</th></tr>';
-    const cell = n => '<td class="num' + (n ? '' : ' zero') + '">' + n + '</td>';
-    AGES.forEach(a => {
-      const cells = fors.map(f => sum(ready.filter(r => r.age === a && r.forWho === f), avail));
-      h += '<tr><td>' + a + '</td>' + cells.map(cell).join('') + cell(cells.reduce((s, n) => s + n, 0)) + '</tr>';
-    });
-    const tots = fors.map(f => sum(ready.filter(r => r.forWho === f), avail));
-    h += '<tr class="total"><td>All ages</td>' + tots.map(cell).join('') + cell(tots.reduce((s, n) => s + n, 0)) + '</tr></table>';
-    $('iAges').innerHTML = h;
     renderCombo(ready, avail);
 
     const bySize = SIZES.map(s => [s, sum(ready.filter(r => r.size === s), avail)]);
