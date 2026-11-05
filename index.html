@@ -215,10 +215,23 @@
   ];
   /* ================================================================================================================ */
 
-  const APP_VERSION = 'toys v12';
+  const APP_VERSION = 'toys v13';
   const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
   const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card', 'Bible', 'Bike'];
   const PRICE_SIZES = ['', 'Stocking', 'Small', 'Medium', 'Large']; // a price only picks among these
+  // A name with "bike"/"bicycle" picks Bike and "bible" picks Bible (not for things like a bike helmet or a
+  // bike coloring book). It never replaces a size someone tapped, and an automatic pick is undone if the
+  // name stops matching (e.g. while typing "bike lock").
+  const BIKE_WORDS = /\b(bikes?|bicycles?)\b/i;
+  const NOT_A_BIKE = /\b(helmets?|bells?|locks?|lights?|horns?|baskets?|pumps?|tires?|tyres?|streamers?|accessor(y|ies)|seats?|gloves?|stickers?|books?|coloring|colouring|puzzles?|posters?|shirts?)\b/i;
+  function sizeFromName(name) {
+    if (!current) return;
+    const auto = current.autoSized;
+    if (!auto && PRICE_SIZES.indexOf(current.size || '') < 0) return;
+    const want = /\bbibles?\b/i.test(name) ? 'Bible' : BIKE_WORDS.test(name) && !NOT_A_BIKE.test(name) ? 'Bike' : '';
+    if (want) { setChoice('size', want); current.autoSized = true; }
+    else if (auto) { current.autoSized = false; setChoice('size', sizeForPrice(parseFloat($('fPrice').value)) || ''); }
+  }
   const $ = id => document.getElementById(id);
   const status = (t, err) => { $('status').textContent = t; $('status').classList.toggle('err', !!err); };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -279,10 +292,11 @@
   document.querySelectorAll('.choices').forEach(group => {
     group.querySelectorAll('button').forEach(b => b.onclick = () => {
       setChoice(group.dataset.field, valueOf(b));
+      if (current && group.dataset.field === 'size') current.autoSized = false; // tapped by hand: keep it
       if (group.dataset.field === 'size' && valueOf(b) === 'Gift Card') setChoice('age', '15-18'); // gift cards are for teens
     });
   });
-  $('fName').addEventListener('input', () => { if ($('fName').value.trim()) $('fNameMsg').hidden = true; });
+  $('fName').addEventListener('input', () => { if ($('fName').value.trim()) $('fNameMsg').hidden = true; sizeFromName($('fName').value); });
   // A price picks Stocking/Small/Medium/Large, but never replaces Gift Card, Bible or Bike once chosen.
   $('fPrice').oninput = () => {
     if (current && PRICE_SIZES.indexOf(current.size || '') < 0) return;
@@ -446,6 +460,7 @@
       if (r.price !== '' && r.price != null && !$('fPrice').value) { $('fPrice').value = r.price; $('fPrice').oninput(); }
       showPrices(r.prices || []);
       if (/gift\s*card/i.test(r.name)) { setChoice('size', 'Gift Card'); setChoice('age', '15-18'); }
+      else sizeFromName($('fName').value);
       status('Found it' + (r.price ? ' ($' + r.price + ', size picked from the price)' : '') + '. ' +
         ((r.prices || []).length > 1 ? 'If the tag is different, tap the matching store price or type it. ' : '') + 'Pick who it\'s for and the age.');
     }).catch(() => status('Pick who it\'s for, the age and the size.'));
