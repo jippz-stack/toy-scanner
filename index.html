@@ -15,7 +15,7 @@
   header .loc { font-size:13px; opacity:.85; margin-top:2px; }
   .hright { text-align:right; line-height:1.25; font-size:13px; }
   main { padding:16px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left)); display:flex; flex-direction:column; gap:14px; max-width:520px; margin:0 auto; }
-  .mode { display:grid; grid-template-columns:1fr 1fr 1fr; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  .mode { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
   .mode button { border:0; padding:12px 4px; font-size:15px; background:var(--card); color:var(--fg); }
   .mode button.on { background:var(--fg); color:#fff; }
   #reader { width:100%; border-radius:10px; overflow:hidden; background:#000; }
@@ -73,6 +73,12 @@
   .qty { display:flex; align-items:center; gap:8px; }
   .qty button { width:44px; height:44px; font-size:22px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
   .qty input { width:70px; text-align:center; }
+  .seg { display:grid; grid-template-columns:repeat(4, 1fr); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .seg button { border:0; padding:10px 4px; font-size:14px; background:var(--card); color:var(--fg); }
+  .seg button + button { border-left:1px solid var(--line); }
+  .seg button.on { background:var(--green); color:#fff; }
+  #iCombo table td, #iCombo table th { padding:7px 3px; }
+  #iCombo table th { font-size:11px; }
   #recent li.gone .code { text-decoration:line-through; color:var(--muted); }
   #recent .rm { color:var(--red); border-color:#e8c4c1; }
   .chips { display:flex; flex-wrap:wrap; gap:6px; }
@@ -109,7 +115,6 @@
   <div id="app" hidden style="display:flex;flex-direction:column;gap:14px">
     <div class="mode">
       <button id="mQuick" class="on">Quick add</button>
-      <button id="mBatch">Batch scan</button>
       <button id="mInv">Inventory</button>
     </div>
 
@@ -168,6 +173,12 @@
         <ul id="needList"></ul>
       </div>
       <div class="card">
+        <div><h3>Available by age and gift size</h3><p class="sub">How many toys are on hand for each age and size. Pick who they're for.</p></div>
+        <div class="seg" id="iForSeg"><button data-f="Boy">Boy</button><button data-f="Girl">Girl</button><button data-f="Either">Either</button><button data-f="" class="on">All</button></div>
+        <div id="iCombo"></div>
+        <p class="sub">Stock = Stocking (under $5) · Sm = Small ($5–14.99) · Med = Medium ($15–24.99) · Lg = Large ($25+) · Gift = Gift Card</p>
+      </div>
+      <div class="card">
         <div><h3>Available by age</h3><p class="sub">Toys still on hand with their details filled in.</p></div>
         <div id="iAges"></div>
       </div>
@@ -201,7 +212,7 @@
   ];
   /* ================================================================================================================ */
 
-  const APP_VERSION = 'toys v10';
+  const APP_VERSION = 'toys v11';
   const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
   const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card'];
   const $ = id => document.getElementById(id);
@@ -242,18 +253,16 @@
   /* ---------- Modes ---------- */
   let mode = 'quick', current = null, formOpen = false;
   $('mQuick').onclick = () => setMode('quick');
-  $('mBatch').onclick = () => setMode('batch');
   $('mInv').onclick = () => setMode('inv');
   function setMode(m) {
     mode = m;
     $('mQuick').classList.toggle('on', m === 'quick');
-    $('mBatch').classList.toggle('on', m === 'batch');
     $('mInv').classList.toggle('on', m === 'inv');
     if (formOpen) closeForm();
     const inv = m === 'inv';
     $('invPane').hidden = !inv; $('allPane').hidden = true; $('scanPane').hidden = inv; $('scanExtras').hidden = inv;
     if (inv) { stopCamera(); loadInventory(); return; }
-    status(m === 'batch' ? 'Batch scan: each barcode saves with a beep. Finish the details later in Inventory.' : 'Quick add: scan a toy, then pick who it\'s for, the age and the size.');
+    status('Quick add: scan a toy, then pick who it\'s for, the age and the size.');
   }
 
   /* ---------- Form choices ---------- */
@@ -305,7 +314,7 @@
         code => onScan(code)
       );
       $('startBtn').hidden = true; $('stopBtn').hidden = false;
-      status(mode === 'batch' ? 'Scanning. Hold each barcode in the box until it beeps.' : 'Scanning. Hold a barcode in the box.');
+      status('Scanning. Hold a barcode in the box.');
     } catch (e) {
       status('The camera didn\'t start. Allow camera access when asked, or use a photo instead. (' + (e && e.message ? e.message : e) + ')', true);
     }
@@ -327,14 +336,7 @@
     lastCode = code; lastAt = now;
     if (stillInView) return;
     beep(true);
-    if (mode === 'batch') { saveBatch(code); return; }
     openForm({ barcode: code });
-  }
-
-  function saveBatch(code) {
-    const li = addRecent(code, 'Saving…');
-    send({ barcode: code }, li);
-    status('Got ' + code + '. Scan the next one.');
   }
 
   async function send(item, li) {
@@ -469,7 +471,7 @@
   $('saveBtn').onclick = async () => {
     if (!current) return;
     current.name = $('fName').value.trim();
-    if (!current.name) { // the name is required (batch scan still saves barcodes only; finish them in Needs info)
+    if (!current.name) { // the name is required
       status('Type the toy\'s name — it\'s required.', true);
       if (mode === 'inv') { $('invStatus').textContent = ''; $('allStatus').textContent = ''; }
       $('fNameMsg').hidden = false; $('fName').focus(); return;
@@ -548,12 +550,31 @@
     const tots = fors.map(f => sum(ready.filter(r => r.forWho === f), avail));
     h += '<tr class="total"><td>All ages</td>' + tots.map(cell).join('') + cell(tots.reduce((s, n) => s + n, 0)) + '</tr></table>';
     $('iAges').innerHTML = h;
+    renderCombo(ready, avail);
 
     const bySize = SIZES.map(s => [s, sum(ready.filter(r => r.size === s), avail)]);
     const max = Math.max(1, ...bySize.map(x => x[1]));
     $('iSizes').innerHTML = bySize.map(([s, n]) =>
       '<div class="bar"><span>' + s + '</span><div class="track"><div class="fill" style="width:' + (n / max * 100) + '%"></div></div><span class="n">' + n + '</span></div>').join('');
   }
+  /* ---------- Available by age and gift size, for Boy / Girl / Either / All ---------- */
+  let comboFor = '';
+  const SIZE_SHORT = { 'Stocking': 'Stock', 'Small': 'Sm', 'Medium': 'Med', 'Large': 'Lg', 'Gift Card': 'Gift' };
+  document.querySelectorAll('#iForSeg button').forEach(b => b.onclick = () => {
+    comboFor = b.dataset.f;
+    document.querySelectorAll('#iForSeg button').forEach(x => x.classList.toggle('on', x === b));
+    renderInventory();
+  });
+  function renderCombo(ready, avail) {
+    const list = ready.filter(r => !comboFor || r.forWho === comboFor);
+    const n = (age, size) => list.filter(r => (!age || r.age === age) && (!size || r.size === size)).reduce((s, r) => s + avail(r), 0);
+    const cell = v => '<td class="num' + (v ? '' : ' zero') + '">' + v + '</td>';
+    let h = '<table><tr><th>Age</th>' + SIZES.map(z => '<th class="num">' + SIZE_SHORT[z] + '</th>').join('') + '<th class="num">Total</th></tr>';
+    AGES.forEach(a => { h += '<tr><td>' + a + '</td>' + SIZES.map(z => cell(n(a, z))).join('') + cell(n(a, '')) + '</tr>'; });
+    h += '<tr class="total"><td>All</td>' + SIZES.map(z => cell(n('', z))).join('') + cell(n('', '')) + '</tr></table>';
+    $('iCombo').innerHTML = h;
+  }
+
   /* ---------- All toys (from the Toys collected tile) ---------- */
   function openAll() { if (!invData) return; $('invPane').hidden = true; $('allPane').hidden = false; $('allSearch').value = ''; renderAll(); window.scrollTo(0, 0); }
   $('iToysTile').onclick = openAll;
