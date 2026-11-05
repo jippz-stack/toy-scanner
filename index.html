@@ -82,7 +82,8 @@
   .tile.open .l::after { content:' ›'; }
   #allList { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
   #allList li { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--card); font-size:14px; }
-  #allList .what { min-width:0; }
+  #allList .what { min-width:0; cursor:pointer; flex:1; }
+  #allList .edit { color:var(--green); text-decoration:underline; }
   #allList .nm { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #allList .dt { font-size:12px; color:var(--muted); }
   #allList .acts { display:flex; gap:6px; flex-shrink:0; }
@@ -121,7 +122,7 @@
 
     <div class="card" id="form" hidden>
       <div><div class="lbl" id="fTitle">Barcode</div><div id="fCode" style="font-size:18px;font-variant-numeric:tabular-nums"></div></div>
-      <div><label for="fName">Item name</label><input id="fName" placeholder="Optional"></div>
+      <div><label for="fName">Item name (required)</label><input id="fName" placeholder="What is it?"><div id="fNameMsg" hidden style="color:var(--red);font-size:13px;margin-top:4px">Type the toy's name before saving.</div></div>
       <div id="fQtyBox"><label for="fQty">How many</label><div class="qty"><button type="button" id="fQtyMinus" aria-label="Fewer">−</button><input id="fQty" type="number" inputmode="numeric" min="1" max="999" value="1"><button type="button" id="fQtyPlus" aria-label="More">+</button></div></div>
       <div><label for="fPrice">Price</label><div class="price"><span>$</span><input id="fPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="From the lookup or the tag"></div></div>
       <div id="fPricesBox" hidden><div class="lbl" style="margin-bottom:6px">Store prices found (tap the one that matches)</div><div class="chips" id="fPrices"></div></div>
@@ -163,7 +164,7 @@
         <div class="tile warn"><div class="n" id="iNeed">–</div><div class="l">Need details</div></div>
       </div>
       <div class="card">
-        <div><h3>Needs info</h3><p class="sub">Tap a toy to add who it's for, the age and the size.</p></div>
+        <div><h3>Needs info</h3><p class="sub">Tap a toy to add its name, who it's for, the age and the size.</p></div>
         <ul id="needList"></ul>
       </div>
       <div class="card">
@@ -200,7 +201,7 @@
   ];
   /* ================================================================================================================ */
 
-  const APP_VERSION = 'toys v8';
+  const APP_VERSION = 'toys v10';
   const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
   const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card'];
   const $ = id => document.getElementById(id);
@@ -268,6 +269,7 @@
       if (group.dataset.field === 'size' && valueOf(b) === 'Gift Card') setChoice('age', '15-18'); // gift cards are for teens
     });
   });
+  $('fName').addEventListener('input', () => { if ($('fName').value.trim()) $('fNameMsg').hidden = true; });
   $('fPrice').oninput = () => { const sz = sizeForPrice(parseFloat($('fPrice').value)); if (sz) setChoice('size', sz); };
 
   /* ---------- Beep (needs a tap first on iPhone) ---------- */
@@ -400,24 +402,27 @@
   }
 
   /* ---------- Toy form: a new scan (Quick add) or a toy from Needs info ---------- */
-  function openForm(toy) {
+  let editFrom = ''; // 'all' or 'needs' when editing a toy already in the Sheet
+  function openForm(toy, from) {
     formOpen = true;
+    editFrom = toy.row ? (from || 'needs') : '';
     if (scanner && scanner.isScanning) { try { scanner.pause(true); } catch (e) {} }
     current = { barcode: toy.barcode };
     if (toy.row) current.row = toy.row;
     const noCode = !toy.barcode && !toy.row;
-    $('fTitle').textContent = toy.row ? 'Finish details' : noCode ? 'Add a toy without a barcode' : 'Barcode';
-    $('fCode').textContent = noCode ? 'Type the name, then pick the details.' : toy.barcode;
-    $('fCode').style.fontSize = noCode ? '15px' : '';
-    $('fQty').value = 1; $('fQtyBox').hidden = !!toy.row;
-    $('fName').value = toy.name || '';
+    const nbId = /^NB-/.test(toy.barcode || '');
+    $('fTitle').textContent = toy.row ? (editFrom === 'all' ? 'Edit toy' : 'Finish details') : noCode ? 'Add a toy without a barcode' : 'Barcode';
+    $('fCode').textContent = noCode ? 'Type the name, then pick the details.' : nbId ? 'No barcode (ID ' + toy.barcode + ')' : toy.barcode;
+    $('fCode').style.fontSize = noCode || nbId ? '15px' : '';
+    $('fQty').value = toy.row ? toy.qty : 1; $('fQtyBox').hidden = false;
+    $('fName').value = toy.name || ''; $('fNameMsg').hidden = true;
     $('fPrice').value = toy.price === '' || toy.price == null ? '' : toy.price;
     $('fAmz').href = 'https://www.amazon.com/s?k=' + encodeURIComponent(toy.name || toy.barcode);
     $('fPrices').innerHTML = ''; $('fPricesBox').hidden = true;
     setChoice('forWho', toy.forWho || ''); setChoice('age', toy.age || ''); setChoice('size', toy.size || '');
     $('saveBtn').textContent = toy.row ? 'Save details' : 'Save toy';
     $('form').hidden = false;
-    if (toy.row) { $('invPane').hidden = true; }
+    if (toy.row) { $('invPane').hidden = true; $('allPane').hidden = true; }
     $('form').scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (toy.row) return;
     if (noCode) { status('Adding a toy without a barcode. The name is required.'); setTimeout(() => $('fName').focus(), 300); return; }
@@ -455,24 +460,34 @@
     const wasEdit = current && current.row;
     formOpen = false; current = null;
     $('form').hidden = true; $('saveBtn').disabled = false;
-    if (wasEdit && mode === 'inv') { $('invPane').hidden = false; renderInventory(); }
+    if (wasEdit && mode === 'inv') {
+      if (editFrom === 'all') { $('allPane').hidden = false; renderAll(); }
+      else { $('invPane').hidden = false; renderInventory(); }
+    }
     if (scanner) { try { scanner.resume(); } catch (e) {} }
   }
   $('saveBtn').onclick = async () => {
     if (!current) return;
     current.name = $('fName').value.trim();
-    if (!current.barcode && !current.row && !current.name) { status('Type the toy\'s name first.', true); $('fName').focus(); return; }
+    if (!current.name) { // the name is required (batch scan still saves barcodes only; finish them in Needs info)
+      status('Type the toy\'s name — it\'s required.', true);
+      if (mode === 'inv') { $('invStatus').textContent = ''; $('allStatus').textContent = ''; }
+      $('fNameMsg').hidden = false; $('fName').focus(); return;
+    }
     const p = parseFloat($('fPrice').value);
     current.price = isNaN(p) ? '' : p;
-    if (!current.row) current.qty = Math.max(1, Math.min(999, parseInt($('fQty').value, 10) || 1));
+    current.qty = Math.max(1, Math.min(999, parseInt($('fQty').value, 10) || 1));
     const item = current;
     $('saveBtn').disabled = true;
-    const label = (item.barcode ? item.barcode + (item.name ? ' · ' + item.name : '') : item.name) + (item.qty > 1 ? ' ×' + item.qty : '');
+    const label = (item.barcode && !/^NB-/.test(item.barcode) ? item.barcode + (item.name ? ' · ' + item.name : '') : item.name || item.barcode) + (item.qty > 1 ? ' ×' + item.qty : '');
     const li = addRecent(label, 'Saving…');
     closeForm();
     if (item.barcode) { lastCode = item.barcode; lastAt = Date.now(); } // don't re-read the same toy right away
     const ok = await send(item, li);
-    if (mode === 'inv') { renderInventory(); $('invStatus').textContent = ok ? 'Saved.' : 'That one didn\'t save. Try again.'; }
+    if (mode === 'inv') {
+      renderInventory(); $('invStatus').textContent = ok ? 'Saved.' : 'That one didn\'t save. Try again.';
+      if (!$('allPane').hidden) { renderAll(); $('allStatus').textContent = ok ? 'Saved.' : 'That one didn\'t save. Try again.'; }
+    }
     else status(ok ? 'Saved. Scan the next toy.' : 'That one didn\'t save. Tap Retry next to it.', !ok);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -515,11 +530,11 @@
     if (!need.length) ul.innerHTML = '<li style="cursor:default;border-left-color:var(--green)">Every toy has its details filled in.</li>';
     need.forEach(r => {
       const li = document.createElement('li');
-      const missing = [!r.forWho && 'for', !r.age && 'age', !r.size && 'size'].filter(Boolean).join(', ');
+      const missing = [!String(r.name || '').trim() && 'name', !r.forWho && 'for', !r.age && 'age', !r.size && 'size'].filter(Boolean).join(', ');
       li.innerHTML = '<span class="what"></span><span class="miss"></span>';
       li.querySelector('.what').textContent = (r.name || r.barcode) + (r.qty > 1 ? ' ×' + r.qty : '');
       li.querySelector('.miss').textContent = 'needs ' + missing;
-      li.onclick = () => openForm(r);
+      li.onclick = () => openForm(r, 'needs');
       ul.append(li);
     });
 
@@ -556,8 +571,12 @@
       const li = document.createElement('li');
       li.innerHTML = '<div class="what"><div class="nm"></div><div class="dt"></div></div><div class="acts"></div>';
       li.querySelector('.nm').textContent = (r.name || r.barcode) + (r.qty > 1 ? ' ×' + r.qty : '');
-      li.querySelector('.dt').textContent = [r.name ? r.barcode : '', r.forWho, r.age, r.size, r.price !== '' ? '$' + Number(r.price).toFixed(2) : '', r.given ? r.given + ' given' : '']
+      li.querySelector('.dt').textContent = [r.name && !/^NB-/.test(r.barcode) ? r.barcode : '', r.forWho, r.age, r.size, r.price !== '' ? '$' + Number(r.price).toFixed(2) : '', r.given ? r.given + ' given' : '']
         .filter(Boolean).join(' · ') || 'Needs info';
+      if (!r.name) li.querySelector('.dt').textContent += ' · no name';
+      const ed = document.createElement('span'); ed.className = 'edit'; ed.textContent = 'Tap to edit';
+      li.querySelector('.dt').append(' · ', ed);
+      li.querySelector('.what').onclick = () => openForm(r, 'all');
       const acts = li.querySelector('.acts');
       // With more than one: "Remove 1" takes one off; "Remove all" takes the toy off the Sheet.
       if (r.qty > 1) { const m = document.createElement('button'); m.textContent = 'Remove 1'; m.onclick = () => removeFromAll(r, true); acts.append(m); }
