@@ -20,6 +20,18 @@
   .mode button.on { background:var(--fg); color:#fff; }
   #reader { width:100%; border-radius:10px; overflow:hidden; background:#000; }
   #reader video { border-radius:10px; }
+  .camWrap { position:relative; }
+  #camMsg { position:absolute; left:50%; bottom:12px; transform:translateX(-50%); z-index:5; max-width:calc(100% - 24px);
+    background:rgba(0,0,0,.78); color:#fff; font-size:16px; font-weight:600; padding:10px 16px; border-radius:999px;
+    display:flex; align-items:center; gap:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+  #camMsg.ok { background:rgba(31,107,69,.92); }
+  #camMsg.bad { background:rgba(178,34,34,.92); }
+  .spin { width:16px; height:16px; flex:none; border:3px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .lookup { display:flex; align-items:center; gap:10px; font-size:15px; font-weight:600; padding:10px 12px; border-radius:8px; background:#fff6d6; color:#6b4e00; }
+  .lookup.ok { background:#e3f3ea; color:var(--green); }
+  .lookup.none { background:#f1f1f1; color:var(--muted); }
+  .sect { border-top:2px solid var(--line); padding-top:12px; }
   .btn { display:block; width:100%; padding:14px; font-size:16px; border-radius:10px; border:0; background:var(--red); color:#fff; font-weight:600; text-align:center; cursor:pointer; text-decoration:none; }
   .btn.alt { background:var(--card); color:var(--fg); border:1px solid var(--line); font-weight:500; }
   .btn:disabled { opacity:.6; }
@@ -138,7 +150,7 @@
     </div>
 
     <div id="scanPane" style="display:flex;flex-direction:column;gap:14px">
-      <div id="reader"></div>
+      <div class="camWrap"><div id="reader"></div><div id="camMsg" hidden></div></div>
       <button class="btn" id="startBtn">Start scanning</button>
       <button class="btn alt" id="stopBtn" hidden>Stop camera</button>
       <div id="status">Tap Start scanning and point the camera at a barcode.</div>
@@ -146,12 +158,13 @@
 
     <div class="card" id="form" hidden>
       <div><div class="lbl" id="fTitle">Barcode</div><div id="fCode" style="font-size:18px;font-variant-numeric:tabular-nums"></div></div>
+      <div id="fLookup" class="lookup" hidden></div>
       <div><label for="fName">Item name (required)</label><input id="fName" placeholder="What is it?"><div id="fNameMsg" hidden style="color:var(--red);font-size:13px;margin-top:4px">Type the toy's name before saving.</div></div>
       <div id="fQtyBox"><label for="fQty">How many</label><div class="qty"><button type="button" id="fQtyMinus" aria-label="Fewer">−</button><input id="fQty" type="number" inputmode="numeric" min="1" max="999" value="1"><button type="button" id="fQtyPlus" aria-label="More">+</button></div></div>
       <div><label for="fPrice">Price</label><div class="price"><span>$</span><input id="fPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="From the lookup or the tag"></div></div>
       <div id="fPricesBox" hidden><div class="lbl" style="margin-bottom:6px">Store prices found (tap the one that matches)</div><div class="chips" id="fPrices"></div></div>
       <a class="amz" id="fAmz" target="_blank" rel="noopener">Check price on Amazon ↗</a>
-      <div><div class="lbl">Gift size</div>
+      <div class="sect"><div class="lbl">Gift size</div>
         <div class="choices" data-field="size">
           <button data-v="Stocking">Stocking<span class="hint">under $5</span></button>
           <button data-v="Small">Small<span class="hint">$5–14.99</span></button>
@@ -163,9 +176,9 @@
           <button data-v="Action Bible">📖 Action Bible</button>
           <button data-v="Storybook Bible">📖 Storybook Bible</button>
         </div></div>
-      <div><div class="lbl">For</div>
+      <div class="sect"><div class="lbl">For</div>
         <div class="choices" data-field="forWho"><button>Boy</button><button>Girl</button><button>Either</button></div></div>
-      <div><div class="lbl">Age</div>
+      <div class="sect"><div class="lbl">Age</div>
         <div class="choices" data-field="age"><button>0-2</button><button>3-5</button><button>6-8</button><button>9-11</button><button>12-14</button><button>15-18</button></div></div>
       <button class="btn" id="saveBtn">Save toy</button>
       <button class="btn alt" id="skipBtn">Cancel</button>
@@ -275,7 +288,7 @@
   ];
   /* ================================================================================================================ */
 
-  const APP_VERSION = 'toys v17';
+  const APP_VERSION = 'toys v18';
   const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
   const BIBLES = ['Standard Bible', 'Action Bible', 'Storybook Bible'];
   const isBible = z => BIBLES.indexOf(z) >= 0;
@@ -299,6 +312,24 @@
     else if (auto) { current.autoSized = false; setChoice('size', sizeForPrice(parseFloat($('fPrice').value)) || ''); }
   }
   const $ = id => document.getElementById(id);
+  // A message on top of the camera picture, so it shows even when the camera fills the screen.
+  let camTimer = 0;
+  function camMsg(text, kind, ms) {
+    const m = $('camMsg'); clearTimeout(camTimer);
+    if (!text) { m.hidden = true; return; }
+    m.className = kind && kind !== 'busy' ? kind : '';
+    m.innerHTML = kind === 'busy' ? '<span class="spin"></span><span></span>' : '<span></span>';
+    m.lastChild.textContent = text; m.hidden = false;
+    if (ms) camTimer = setTimeout(() => { m.hidden = true; }, ms);
+  }
+  // The lookup banner at the top of the toy form.
+  function lookupMsg(text, kind) {
+    const b = $('fLookup');
+    if (!text) { b.hidden = true; return; }
+    b.className = 'lookup' + (kind && kind !== 'busy' ? ' ' + kind : '');
+    b.innerHTML = kind === 'busy' ? '<span class="spin"></span><span></span>' : '<span></span>';
+    b.lastChild.textContent = text; b.hidden = false;
+  }
   const status = (t, err) => { $('status').textContent = t; $('status').classList.toggle('err', !!err); };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -421,6 +452,7 @@
   };
   $('stopBtn').onclick = () => stopCamera();
   function stopCamera() {
+    camMsg('');
     if (scanner && scanner.isScanning) scanner.stop().catch(() => {});
     $('startBtn').hidden = false; $('stopBtn').hidden = true;
   }
@@ -522,7 +554,7 @@
     $('fName').value = toy.name || ''; $('fNameMsg').hidden = true;
     $('fPrice').value = toy.price === '' || toy.price == null ? '' : toy.price;
     $('fAmz').href = 'https://www.amazon.com/s?k=' + encodeURIComponent(toy.name || toy.barcode);
-    $('fPrices').innerHTML = ''; $('fPricesBox').hidden = true;
+    $('fPrices').innerHTML = ''; $('fPricesBox').hidden = true; lookupMsg('');
     setChoice('forWho', toy.forWho || ''); setChoice('age', toy.age || ''); setChoice('size', toy.size || '');
     $('saveBtn').textContent = countNew ? 'Count it' : toy.row ? 'Save details' : 'Save toy';
     $('form').hidden = false;
@@ -531,19 +563,26 @@
     if (toy.row) return;
     if (noCode) { status(countNew ? 'Type the leftover\'s name and details, then tap Count it.' : 'Adding a toy without a barcode. The name is required.'); setTimeout(() => $('fName').focus(), 300); return; }
     status('Looking up ' + toy.barcode + '…');
+    lookupMsg('Looking up the name and price…', 'busy');
+    if (!countNew) camMsg('Scanned · looking it up…', 'busy');
     api({ action: 'lookup', barcode: toy.barcode }).then(r => {
       if (isAccessError(r)) { lockOut(r.error); return; }
       if (!current || current.barcode !== toy.barcode) return;
-      if (!r.found) { status('No name found. Type one if you like, then pick who it\'s for, the age and the size.'); return; }
+      if (!r.found) { lookupMsg('No match found. Type the name below.', 'none'); camMsg('No match found · type the name below ↓', '', 4000); status('No name found. Type one if you like, then pick who it\'s for, the age and the size.'); return; }
       if (!$('fName').value) $('fName').value = r.name;
       current.brand = r.brand;
       if (r.price !== '' && r.price != null && !$('fPrice').value) { $('fPrice').value = r.price; $('fPrice').oninput(); }
       showPrices(r.prices || []);
       if (/gift\s*card/i.test(r.name)) { setChoice('size', 'Gift Card'); setChoice('age', '15-18'); }
       else sizeFromName($('fName').value);
+      lookupMsg('✓ Found it. Check the name and price.', 'ok'); camMsg('✓ Found it · details below ↓', 'ok', 4000);
       status('Found it' + (r.price ? ' ($' + r.price + ', size picked from the price)' : '') + '. ' +
         ((r.prices || []).length > 1 ? 'If the tag is different, tap the matching store price or type it. ' : '') + 'Pick who it\'s for and the age.');
-    }).catch(() => status('Pick who it\'s for, the age and the size.'));
+    }).catch(() => {
+      if (!current || current.barcode !== toy.barcode) return;
+      lookupMsg('Couldn\'t look it up. Type the name below.', 'none'); camMsg('Couldn\'t look it up · type the name below ↓', 'bad', 4000);
+      status('Pick who it\'s for, the age and the size.');
+    });
   }
   // Store prices from the lookup, as buttons: tapping one sets the price (and so the size).
   function showPrices(list) {
@@ -563,7 +602,7 @@
 
   function closeForm() {
     const wasEdit = current && current.row;
-    formOpen = false; current = null;
+    formOpen = false; current = null; lookupMsg(''); camMsg('');
     $('form').hidden = true; $('saveBtn').disabled = false;
     if (wasEdit && mode === 'inv') {
       if (editFrom === 'all') { $('allPane').hidden = false; renderAll(); }
@@ -704,17 +743,18 @@
     li.innerHTML = '<span class="code"></span><span class="right"><span class="st">Saving…</span></span>';
     li.querySelector('.code').textContent = item ? item.name : barcode;
     $('countRecent').prepend(li);
+    if (n > 0 && !item) camMsg('Scanned · counting…', 'busy');
     while ($('countRecent').children.length > 8) $('countRecent').lastChild.remove();
     try {
       const r = await api({ action: 'countScan', barcode: barcode, n: n, item: item || null });
       if (isAccessError(r)) { lockOut(r.error); return; }
       if (!r.ok && r.error === 'not_in_inventory') {
-        li.remove(); beep(false);
+        li.remove(); beep(false); camMsg('Not in the inventory · add it below ↓', 'bad', 4000);
         status('That toy isn\'t in the inventory. Add its details to count it.');
         openForm({ barcode: barcode }, 'countNew');
         return;
       }
-      if (!r.ok) { li.querySelector('.st').textContent = 'Not counted'; li.querySelector('.st').classList.add('bad'); beep(false); return; }
+      if (!r.ok) { li.querySelector('.st').textContent = 'Not counted'; li.querySelector('.st').classList.add('bad'); beep(false); camMsg('Not counted · try again', 'bad', 4000); return; }
       li.querySelector('.code').textContent = (r.name || r.barcode) + (r.inInventory === false ? ' (not in inventory)' : '');
       const right = li.querySelector('.right');
       right.innerHTML = '<span class="st"></span>';
@@ -732,7 +772,8 @@
         countData.summary = r.summary; renderCount();
       }
       status(n < 0 ? 'Took one back.' : 'Counted. Scan the next leftover.');
-    } catch (e) { li.querySelector('.st').textContent = 'No connection'; li.querySelector('.st').classList.add('bad'); beep(false); }
+      camMsg(n < 0 ? 'Took one back · left ' + r.left : '✓ Counted ' + (r.name || r.barcode) + ' · left ' + r.left, 'ok', 2500);
+    } catch (e) { li.querySelector('.st').textContent = 'No connection'; li.querySelector('.st').classList.add('bad'); beep(false); camMsg('No connection · not counted', 'bad', 4000); }
   }
   $('cManualBtn').onclick = () => { const v = $('cManual').value.trim(); if (v) { $('cManual').value = ''; lastCode = ''; onScan(v); } };
   $('cNewBtn').onclick = () => { if (!formOpen) openForm({ barcode: '' }, 'countNew'); };
