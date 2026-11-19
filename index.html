@@ -151,10 +151,6 @@
       <div><label for="fPrice">Price</label><div class="price"><span>$</span><input id="fPrice" type="number" inputmode="decimal" min="0" step="0.01" placeholder="From the lookup or the tag"></div></div>
       <div id="fPricesBox" hidden><div class="lbl" style="margin-bottom:6px">Store prices found (tap the one that matches)</div><div class="chips" id="fPrices"></div></div>
       <a class="amz" id="fAmz" target="_blank" rel="noopener">Check price on Amazon ↗</a>
-      <div><div class="lbl">For</div>
-        <div class="choices" data-field="forWho"><button>Boy</button><button>Girl</button><button>Either</button></div></div>
-      <div><div class="lbl">Age</div>
-        <div class="choices" data-field="age"><button>0-2</button><button>3-5</button><button>6-8</button><button>9-11</button><button>12-14</button><button>15-18</button></div></div>
       <div><div class="lbl">Gift size</div>
         <div class="choices" data-field="size">
           <button data-v="Stocking">Stocking<span class="hint">under $5</span></button>
@@ -167,6 +163,10 @@
           <button data-v="Action Bible">📖 Action Bible</button>
           <button data-v="Storybook Bible">📖 Storybook Bible</button>
         </div></div>
+      <div><div class="lbl">For</div>
+        <div class="choices" data-field="forWho"><button>Boy</button><button>Girl</button><button>Either</button></div></div>
+      <div><div class="lbl">Age</div>
+        <div class="choices" data-field="age"><button>0-2</button><button>3-5</button><button>6-8</button><button>9-11</button><button>12-14</button><button>15-18</button></div></div>
       <button class="btn" id="saveBtn">Save toy</button>
       <button class="btn alt" id="skipBtn">Cancel</button>
     </div>
@@ -226,7 +226,7 @@
         <div class="tile warn"><div class="n" id="iNeed">–</div><div class="l">Need details</div></div>
       </div>
       <div class="card">
-        <div><h3>Needs info</h3><p class="sub">Tap a toy to add its name, who it's for, the age and the size.</p></div>
+        <div><h3>Needs info</h3><p class="sub">Tap a toy to add its name, the size, who it's for and the age.</p></div>
         <ul id="needList"></ul>
       </div>
       <div class="card">
