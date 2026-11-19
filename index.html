@@ -275,8 +275,11 @@
   ];
   /* ================================================================================================================ */
 
-  const APP_VERSION = 'toys v16';
+  const APP_VERSION = 'toys v17';
   const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
+  const BIBLES = ['Standard Bible', 'Action Bible', 'Storybook Bible'];
+  const isBible = z => BIBLES.indexOf(z) >= 0;
+  const ANY_AGE = 'Any age'; // the tables' row for Bibles, which have no age
   const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card', 'Bike', 'Standard Bible', 'Action Bible', 'Storybook Bible'];
   const PRICE_SIZES = ['', 'Stocking', 'Small', 'Medium', 'Large']; // a price only picks among these
   // A name with "bike"/"bicycle" picks Bike and "bible" picks a Bible ("action bible" Action Bible, "storybook
@@ -355,6 +358,14 @@
     const group = document.querySelector('.choices[data-field="' + field + '"]');
     group.querySelectorAll('button').forEach(x => x.classList.toggle('on', valueOf(x) === v));
     if (current) current[field] = v || '';
+    if (field === 'size') { // Bibles have no Boy/Girl or age: hide those choices and clear them
+      const bible = isBible(v);
+      ['forWho', 'age'].forEach(f => {
+        const g = document.querySelector('.choices[data-field="' + f + '"]');
+        g.parentElement.hidden = bible;
+        if (bible) { g.querySelectorAll('button').forEach(x => x.classList.remove('on')); if (current) current[f] = ''; }
+      });
+    }
   }
   document.querySelectorAll('.choices').forEach(group => {
     group.querySelectorAll('button').forEach(b => b.onclick = () => {
@@ -625,7 +636,7 @@
     if (!need.length) ul.innerHTML = '<li style="cursor:default;border-left-color:var(--green)">Every toy has its details filled in.</li>';
     need.forEach(r => {
       const li = document.createElement('li');
-      const missing = [!String(r.name || '').trim() && 'name', !r.forWho && 'for', !r.age && 'age', !r.size && 'size'].filter(Boolean).join(', ');
+      const missing = [!String(r.name || '').trim() && 'name', !isBible(r.size) && !r.forWho && 'for', !isBible(r.size) && !r.age && 'age', !r.size && 'size'].filter(Boolean).join(', ');
       li.innerHTML = '<span class="what"></span><span class="miss"></span>';
       li.querySelector('.what').textContent = (r.name || r.barcode) + (r.qty > 1 ? ' ×' + r.qty : '');
       li.querySelector('.miss').textContent = 'needs ' + missing;
@@ -774,11 +785,14 @@
     renderInventory();
   });
   function renderCombo(ready, avail) {
-    const list = ready.filter(r => !comboFor || r.forWho === comboFor);
+    // Bibles (no Boy/Girl or age) count under Either and in an "Any age" row.
+    const all = ready.map(r => Object.assign({}, r, { forWho: r.forWho || 'Either', age: r.age || ANY_AGE }));
+    const list = all.filter(r => !comboFor || r.forWho === comboFor);
+    const ages = all.some(r => r.age === ANY_AGE) ? AGES.concat([ANY_AGE]) : AGES;
     const n = (age, size) => list.filter(r => (!age || r.age === age) && (!size || r.size === size)).reduce((s, r) => s + avail(r), 0);
     const cell = v => '<td class="num' + (v ? '' : ' zero') + '">' + v + '</td>';
     let h = '<table><tr><th>Age</th>' + SIZES.map(z => '<th class="num">' + SIZE_SHORT[z] + '</th>').join('') + '<th class="num">Total</th></tr>';
-    AGES.forEach(a => { h += '<tr><td>' + a + '</td>' + SIZES.map(z => cell(n(a, z))).join('') + cell(n(a, '')) + '</tr>'; });
+    ages.forEach(a => { h += '<tr><td>' + a + '</td>' + SIZES.map(z => cell(n(a, z))).join('') + cell(n(a, '')) + '</tr>'; });
     h += '<tr class="total"><td>All</td>' + SIZES.map(z => cell(n('', z))).join('') + cell(n('', '')) + '</tr></table>';
     $('iCombo').innerHTML = h;
   }
