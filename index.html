@@ -162,8 +162,10 @@
           <button data-v="Medium">Medium<span class="hint">$15–24.99</span></button>
           <button data-v="Large">Large<span class="hint">$25+</span></button>
           <button data-v="Gift Card">Gift Card<span class="hint">teens 15-18</span></button>
-          <button data-v="Bible">📖 Bible</button>
           <button data-v="Bike">🚲 Bike</button>
+          <button data-v="Standard Bible">📖 Standard Bible</button>
+          <button data-v="Action Bible">📖 Action Bible</button>
+          <button data-v="Storybook Bible">📖 Storybook Bible</button>
         </div></div>
       <button class="btn" id="saveBtn">Save toy</button>
       <button class="btn alt" id="skipBtn">Cancel</button>
@@ -230,8 +232,8 @@
       <div class="card">
         <div><h3>Available by age and gift size</h3><p class="sub">How many toys are on hand for each age and size. Pick who they're for.</p></div>
         <div class="seg" id="iForSeg"><button data-f="Boy">Boy</button><button data-f="Girl">Girl</button><button data-f="Either">Either</button><button data-f="" class="on">All</button></div>
-        <div id="iCombo"></div>
-        <p class="sub">Stk = Stocking (under $5) · Sm = Small ($5–14.99) · Med = Medium ($15–24.99) · Lg = Large ($25+) · Gift = Gift Card</p>
+        <div id="iCombo" style="overflow-x:auto"></div>
+        <p class="sub">Stk = Stocking (under $5) · Sm = Small ($5–14.99) · Med = Medium ($15–24.99) · Lg = Large ($25+) · Gift = Gift Card · Std / Act / Story = Standard / Action / Storybook Bible</p>
       </div>
       <div class="card">
         <div><h3>Available by gift size</h3></div>
@@ -273,11 +275,12 @@
   ];
   /* ================================================================================================================ */
 
-  const APP_VERSION = 'toys v15';
+  const APP_VERSION = 'toys v16';
   const AGES = ['0-2', '3-5', '6-8', '9-11', '12-14', '15-18'];
-  const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card', 'Bible', 'Bike'];
+  const SIZES = ['Stocking', 'Small', 'Medium', 'Large', 'Gift Card', 'Bike', 'Standard Bible', 'Action Bible', 'Storybook Bible'];
   const PRICE_SIZES = ['', 'Stocking', 'Small', 'Medium', 'Large']; // a price only picks among these
-  // A name with "bike"/"bicycle" picks Bike and "bible" picks Bible (not for things like a bike helmet or a
+  // A name with "bike"/"bicycle" picks Bike and "bible" picks a Bible ("action bible" Action Bible, "storybook
+  // bible"/"story bible" Storybook Bible, any other Standard Bible) (not for things like a bike helmet or a
   // bike coloring book). It never replaces a size someone tapped, and an automatic pick is undone if the
   // name stops matching (e.g. while typing "bike lock").
   const BIKE_WORDS = /\b(bikes?|bicycles?)\b/i;
@@ -286,7 +289,9 @@
     if (!current) return;
     const auto = current.autoSized;
     if (!auto && PRICE_SIZES.indexOf(current.size || '') < 0) return;
-    const want = /\bbibles?\b/i.test(name) ? 'Bible' : BIKE_WORDS.test(name) && !NOT_A_BIKE.test(name) ? 'Bike' : '';
+    const want = /\bbibles?\b/i.test(name)
+      ? (/\baction\s+bibles?\b/i.test(name) ? 'Action Bible' : /\bstory\s*(book\s+)?bibles?\b/i.test(name) ? 'Storybook Bible' : 'Standard Bible')
+      : BIKE_WORDS.test(name) && !NOT_A_BIKE.test(name) ? 'Bike' : '';
     if (want) { setChoice('size', want); current.autoSized = true; }
     else if (auto) { current.autoSized = false; setChoice('size', sizeForPrice(parseFloat($('fPrice').value)) || ''); }
   }
@@ -359,7 +364,7 @@
     });
   });
   $('fName').addEventListener('input', () => { if ($('fName').value.trim()) $('fNameMsg').hidden = true; sizeFromName($('fName').value); });
-  // A price picks Stocking/Small/Medium/Large, but never replaces Gift Card, Bible or Bike once chosen.
+  // A price picks Stocking/Small/Medium/Large, but never replaces Gift Card, a Bible or Bike once chosen.
   $('fPrice').oninput = () => {
     if (current && PRICE_SIZES.indexOf(current.size || '') < 0) return;
     const sz = sizeForPrice(parseFloat($('fPrice').value)); if (sz) setChoice('size', sz);
@@ -762,7 +767,7 @@
 
   /* ---------- Available by age and gift size, for Boy / Girl / Either / All ---------- */
   let comboFor = '';
-  const SIZE_SHORT = { 'Stocking': 'Stk', 'Small': 'Sm', 'Medium': 'Med', 'Large': 'Lg', 'Gift Card': 'Gift', 'Bible': 'Bible', 'Bike': 'Bike' };
+  const SIZE_SHORT = { 'Stocking': 'Stk', 'Small': 'Sm', 'Medium': 'Med', 'Large': 'Lg', 'Gift Card': 'Gift', 'Standard Bible': 'Std', 'Action Bible': 'Act', 'Storybook Bible': 'Story', 'Bike': 'Bike' };
   document.querySelectorAll('#iForSeg button').forEach(b => b.onclick = () => {
     comboFor = b.dataset.f;
     document.querySelectorAll('#iForSeg button').forEach(x => x.classList.toggle('on', x === b));
